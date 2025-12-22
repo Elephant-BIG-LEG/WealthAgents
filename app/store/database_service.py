@@ -1,7 +1,7 @@
 import mysql.connector
 from mysql.connector import Error
 from typing import Optional, Dict, Any
-
+from app.config.config import DB_CONFIG
 
 class DatabaseConnection:
     """
@@ -9,24 +9,15 @@ class DatabaseConnection:
     提供基本的数据库连接功能
     """
     
-    def __init__(self, host: str = 'localhost', user: str = 'root', 
-                 password: str = 'abc123', database: str = 'FinanceData', 
-                 port: int = 13306):
+    def __init__(self):
         """
-        初始化数据库连接配置
-        
-        Args:
-            host: 数据库主机地址
-            user: 数据库用户名
-            password: 数据库密码
-            database: 数据库名称
-            port: 数据库端口号
+        初始化数据库连接配置，从环境变量读取
         """
-        self.host = host
-        self.user = user
-        self.password = password
-        self.database = database
-        self.port = port
+        self.host = DB_CONFIG['host']
+        self.user = DB_CONFIG['user']
+        self.password = DB_CONFIG['password']
+        self.database = DB_CONFIG['database']
+        self.port = DB_CONFIG['port']
         self.connection = None
         
     def connect(self) -> Optional[mysql.connector.connection.MySQLConnection]:
