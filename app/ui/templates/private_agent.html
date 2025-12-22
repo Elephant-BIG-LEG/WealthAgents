@@ -1,0 +1,518 @@
+{% extends "base.html" %}
+
+{% block title %}私人Agent - 智能投研分析平台{% endblock %}
+{% block page_title %}私人Agent{% endblock %}
+{% block active_page %}private-agent{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <h5 class="mb-0"><i class="fas fa-robot me-2"></i>AI投资助手</h5>
+                    <small class="text-muted">与您的专属投资AI助手进行对话</small>
+                </div>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary me-2" id="clear-chat">
+                        <i class="fas fa-trash"></i> 清空对话
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" id="export-chat">
+                        <i class="fas fa-download"></i> 导出对话
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- 对话历史区域 -->
+                <div class="chat-container" id="chat-container">
+                    <div class="chat-messages" id="chat-messages">
+                        <!-- 欢迎消息 -->
+                        <div class="message ai-message">
+                            <div class="message-avatar">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <div class="message-content">
+                                <div class="message-text">
+                                    您好！我是您的专属投资AI助手。我可以帮您分析市场趋势、评估投资机会、解读财务数据等。请问有什么我可以帮您的吗？
+                                </div>
+                                <div class="message-time">现在</div>
+                            </div>
+                        </div>
+
+                        <!-- 示例快捷问题 -->
+                        <div class="quick-questions mt-3">
+                            <small class="text-muted">您可以问我：</small>
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                <button class="btn btn-sm btn-outline-primary quick-question"
+                                    data-question="分析一下最近的市场热点">
+                                    分析一下最近的市场热点
+                                </button>
+                                <button class="btn btn-sm btn-outline-primary quick-question"
+                                    data-question="苹果公司的最新财报怎么样？">
+                                    苹果公司的最新财报怎么样？
+                                </button>
+                                <button class="btn btn-sm btn-outline-primary quick-question"
+                                    data-question="推荐一些值得关注的科技股">
+                                    推荐一些值得关注的科技股
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 输入区域 -->
+                    <div class="chat-input-area mt-4">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="user-input" placeholder="输入您的问题...">
+                            <button class="btn btn-primary" type="button" id="send-message">
+                                <i class="fas fa-paper-plane"></i> 发送
+                            </button>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-lightbulb me-1"></i>提示：您可以询问市场分析、个股研究、投资建议等问题
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Agent列表（折叠面板） -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h6 class="mb-0">
+            <a class="text-decoration-none" data-bs-toggle="collapse" href="#agentListCollapse">
+                <i class="fas fa-chevron-down me-2"></i>我的Agent助手
+            </a>
+        </h6>
+    </div>
+    <div class="collapse" id="agentListCollapse">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 col-lg-3 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <div class="agent-icon bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center"
+                                    style="width: 60px; height: 60px;">
+                                    <i class="fas fa-chart-line fa-2x"></i>
+                                </div>
+                            </div>
+                            <h6>投研分析Agent</h6>
+                            <p class="small text-muted">每日自动分析市场热点</p>
+                            <span class="badge bg-success">运行中</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-3 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <div class="agent-icon bg-warning text-white rounded-circle d-inline-flex align-items-center justify-content-center"
+                                    style="width: 60px; height: 60px;">
+                                    <i class="fas fa-exclamation-triangle fa-2x"></i>
+                                </div>
+                            </div>
+                            <h6>财务预警Agent</h6>
+                            <p class="small text-muted">监控公司财务异常</p>
+                            <span class="badge bg-warning">暂停</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-3 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <div class="agent-icon bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center"
+                                    style="width: 60px; height: 60px;">
+                                    <i class="fas fa-shield-alt fa-2x"></i>
+                                </div>
+                            </div>
+                            <h6>风险评估Agent</h6>
+                            <p class="small text-muted">评估投资组合风险</p>
+                            <span class="badge bg-success">运行中</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-3 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <div class="agent-icon bg-info text-white rounded-circle d-inline-flex align-items-center justify-content-center"
+                                    style="width: 60px; height: 60px;">
+                                    <i class="fas fa-newspaper fa-2x"></i>
+                                </div>
+                            </div>
+                            <h6>新闻情感Agent</h6>
+                            <p class="small text-muted">分析新闻情绪变化</p>
+                            <span class="badge bg-danger">异常</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // 绑定事件
+        document.getElementById('send-message').addEventListener('click', sendMessage);
+        document.getElementById('user-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        document.getElementById('clear-chat').addEventListener('click', clearChat);
+        document.getElementById('export-chat').addEventListener('click', exportChat);
+
+        // 快捷问题事件
+        document.querySelectorAll('.quick-question').forEach(button => {
+            button.addEventListener('click', function () {
+                const question = this.getAttribute('data-question');
+                document.getElementById('user-input').value = question;
+                sendMessage();
+            });
+        });
+
+        // 折叠面板图标切换
+        document.querySelector('[data-bs-toggle="collapse"]').addEventListener('click', function () {
+            const icon = this.querySelector('i');
+            if (icon.classList.contains('fa-chevron-down')) {
+                icon.classList.replace('fa-chevron-down', 'fa-chevron-up');
+            } else {
+                icon.classList.replace('fa-chevron-up', 'fa-chevron-down');
+            }
+        });
+    });
+
+    function sendMessage() {
+        const userInput = document.getElementById('user-input');
+        const message = userInput.value.trim();
+
+        if (!message) {
+            showMessage('请输入您的问题', 'warning');
+            return;
+        }
+
+        // 添加用户消息到聊天记录
+        addMessageToChat('user', message);
+
+        // 清空输入框
+        userInput.value = '';
+
+        // 显示AI正在思考
+        const thinkingMessage = addMessageToChat('ai', '<div class="typing-indicator"><span></span><span></span><span></span></div>', true);
+
+        // 模拟AI回复（实际应用中这里会调用后端API）
+        setTimeout(() => {
+            // 移除思考指示器
+            thinkingMessage.remove();
+
+            // 生成AI回复
+            const aiResponse = generateAIResponse(message);
+            addMessageToChat('ai', aiResponse);
+        }, 1500);
+    }
+
+    function addMessageToChat(sender, content, isTemporary = false) {
+        const chatMessages = document.getElementById('chat-messages');
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${sender}-message`;
+
+        if (sender === 'user') {
+            messageDiv.innerHTML = `
+            <div class="message-content">
+                <div class="message-text">${content}</div>
+                <div class="message-time">${formatTime(new Date())}</div>
+            </div>
+            <div class="message-avatar">
+                <i class="fas fa-user"></i>
+            </div>
+        `;
+        } else {
+            messageDiv.innerHTML = `
+            <div class="message-avatar">
+                <i class="fas fa-robot"></i>
+            </div>
+            <div class="message-content">
+                <div class="message-text">${content}</div>
+                <div class="message-time">${formatTime(new Date())}</div>
+            </div>
+        `;
+        }
+
+        if (isTemporary) {
+            messageDiv.id = 'thinking-message';
+        }
+
+        chatMessages.appendChild(messageDiv);
+
+        // 滚动到底部
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        return messageDiv;
+    }
+
+    function generateAIResponse(userMessage) {
+        // 这里应该是调用实际的AI API，现在我们用模拟回复
+        const responses = [
+            "根据最新的市场数据，我分析了您提到的问题。当前市场趋势显示...",
+            "关于您询问的内容，我已经进行了深入分析。从技术面来看...",
+            "感谢您的提问。基于我的知识库，我可以为您提供以下见解...",
+            "这是一个很好的问题。让我为您详细分析一下相关情况...",
+            "根据我的分析，您关注的领域目前呈现出以下特点..."
+        ];
+
+        // 根据用户消息内容给出更相关的回复
+        if (userMessage.includes('市场') || userMessage.includes('热点')) {
+            return "根据最新的市场数据，当前市场热点主要集中在以下几个方面：<br><br>" +
+                "1. <strong>科技创新板块</strong>：人工智能和半导体行业表现突出<br>" +
+                "2. <strong>新能源领域</strong>：光伏和储能概念持续受到关注<br>" +
+                "3. <strong>消费复苏</strong>：餐饮和旅游板块出现回暖迹象<br><br>" +
+                "建议关注这些领域的龙头股，同时注意控制仓位风险。";
+        } else if (userMessage.includes('苹果') || userMessage.includes('财报')) {
+            return "关于苹果公司的最新财报分析：<br><br>" +
+                "• <strong>营收表现</strong>：本季度营收同比增长8.1%，超出市场预期<br>" +
+                "• <strong>利润率</strong>：净利润率保持在25.2%的高位<br>" +
+                "• <strong>产品线</strong>：iPhone销售额增长6.3%，服务收入增长12.7%<br><br>" +
+                "总体来看，苹果公司基本面稳健，建议长期持有。";
+        } else if (userMessage.includes('科技股') || userMessage.includes('推荐')) {
+            return "基于当前市场环境，我推荐关注以下几只科技股：<br><br>" +
+                "1. <strong>人工智能领域</strong>：关注具备核心技术壁垒的AI芯片公司<br>" +
+                "2. <strong>云计算服务</strong>：行业龙头具有稳定增长潜力<br>" +
+                "3. <strong>半导体设计</strong>：国产替代趋势明显的细分龙头<br><br>" +
+                "投资建议：采用分批建仓策略，关注技术面突破信号。";
+        } else {
+            const randomIndex = Math.floor(Math.random() * responses.length);
+            return responses[randomIndex] + "<br><br>如果您需要更详细的分析，请告诉我具体关注的方面。";
+        }
+    }
+
+    function formatTime(date) {
+        return date.toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    function clearChat() {
+        const chatMessages = document.getElementById('chat-messages');
+        // 保留欢迎消息和快捷问题
+        chatMessages.innerHTML = `
+        <div class="message ai-message">
+            <div class="message-avatar">
+                <i class="fas fa-robot"></i>
+            </div>
+            <div class="message-content">
+                <div class="message-text">
+                    您好！我是您的专属投资AI助手。我可以帮您分析市场趋势、评估投资机会、解读财务数据等。请问有什么我可以帮您的吗？
+                </div>
+                <div class="message-time">现在</div>
+            </div>
+        </div>
+        
+        <div class="quick-questions mt-3">
+            <small class="text-muted">您可以问我：</small>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                <button class="btn btn-sm btn-outline-primary quick-question" data-question="分析一下最近的市场热点">
+                    分析一下最近的市场热点
+                </button>
+                <button class="btn btn-sm btn-outline-primary quick-question" data-question="苹果公司的最新财报怎么样？">
+                    苹果公司的最新财报怎么样？
+                </button>
+                <button class="btn btn-sm btn-outline-primary quick-question" data-question="推荐一些值得关注的科技股">
+                    推荐一些值得关注的科技股
+                </button>
+            </div>
+        </div>
+    `;
+
+        // 重新绑定快捷问题事件
+        document.querySelectorAll('.quick-question').forEach(button => {
+            button.addEventListener('click', function () {
+                const question = this.getAttribute('data-question');
+                document.getElementById('user-input').value = question;
+                sendMessage();
+            });
+        });
+    }
+
+    function exportChat() {
+        showMessage('对话导出功能将在后续版本中实现', 'info');
+    }
+</script>
+<style>
+    .chat-container {
+        display: flex;
+        flex-direction: column;
+        height: 60vh;
+    }
+
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+
+    .message {
+        display: flex;
+        margin-bottom: 20px;
+        animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .ai-message {
+        justify-content: flex-start;
+    }
+
+    .user-message {
+        justify-content: flex-end;
+    }
+
+    .message-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: #e9ecef;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 10px;
+    }
+
+    .ai-message .message-avatar {
+        background-color: #2563eb;
+        color: white;
+    }
+
+    .user-message .message-avatar {
+        background-color: #10b981;
+        color: white;
+    }
+
+    .message-content {
+        max-width: 70%;
+    }
+
+    .ai-message .message-content {
+        margin-left: 10px;
+    }
+
+    .user-message .message-content {
+        margin-right: 10px;
+    }
+
+    .message-text {
+        background-color: white;
+        padding: 12px 16px;
+        border-radius: 18px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .ai-message .message-text {
+        border-top-left-radius: 4px;
+        background-color: #e3f2fd;
+    }
+
+    .user-message .message-text {
+        border-top-right-radius: 4px;
+        background-color: #dcfce7;
+    }
+
+    .message-time {
+        font-size: 0.75rem;
+        color: #6c757d;
+        margin-top: 5px;
+        text-align: right;
+    }
+
+    .chat-input-area .input-group {
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        border-radius: 50px;
+        overflow: hidden;
+    }
+
+    .chat-input-area .form-control {
+        border: none;
+        padding: 15px 20px;
+    }
+
+    .chat-input-area .btn {
+        border: none;
+        padding: 10px 25px;
+        border-radius: 0;
+    }
+
+    .quick-questions .btn {
+        font-size: 0.8rem;
+    }
+
+    /* 打字指示器 */
+    .typing-indicator {
+        display: flex;
+        align-items: center;
+        padding: 5px 0;
+    }
+
+    .typing-indicator span {
+        height: 8px;
+        width: 8px;
+        background-color: #6c757d;
+        border-radius: 50%;
+        display: inline-block;
+        margin: 0 2px;
+        animation: typing 1s infinite;
+    }
+
+    .typing-indicator span:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+
+    .typing-indicator span:nth-child(3) {
+        animation-delay: 0.4s;
+    }
+
+    @keyframes typing {
+
+        0%,
+        100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-5px);
+        }
+    }
+
+    /* 响应式设计 */
+    @media (max-width: 768px) {
+        .message-content {
+            max-width: 85%;
+        }
+
+        .chat-container {
+            height: 70vh;
+        }
+    }
+</style>
+{% endblock %}

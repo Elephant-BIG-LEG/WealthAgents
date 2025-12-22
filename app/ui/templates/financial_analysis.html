@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+
+{% block title %}财务分析 - 智能投研分析平台{% endblock %}
+{% block page_title %}公司财务分析{% endblock %}
+{% block active_page %}financial-analysis{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- 左侧公司搜索和列表 -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <span><i class="fas fa-search"></i> 公司搜索</span>
+            </div>
+            <div class="card-body">
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="company-search" placeholder="输入公司名称或代码">
+                    <button class="btn btn-outline-secondary" type="button" id="search-company">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+
+                <div class="list-group" id="company-list">
+                    <a href="#" class="list-group-item list-group-item-action active">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="mb-1">苹果公司</h6>
+                                <small class="text-muted">AAPL</small>
+                            </div>
+                            <span class="badge bg-success">+2.5%</span>
+                        </div>
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="mb-1">微软公司</h6>
+                                <small class="text-muted">MSFT</small>
+                            </div>
+                            <span class="badge bg-success">+1.8%</span>
+                        </div>
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="mb-1">谷歌</h6>
+                                <small class="text-muted">GOOGL</small>
+                            </div>
+                            <span class="badge bg-danger">-0.5%</span>
+                        </div>
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="mb-1">亚马逊</h6>
+                                <small class="text-muted">AMZN</small>
+                            </div>
+                            <span class="badge bg-success">+3.2%</span>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <span><i class="fas fa-filter"></i> 筛选条件</span>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">行业</label>
+                    <select class="form-select">
+                        <option>全部行业</option>
+                        <option>科技</option>
+                        <option>金融</option>
+                        <option>医疗</option>
+                        <option>消费</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">市值范围</label>
+                    <select class="form-select">
+                        <option>全部</option>
+                        <option>大型股 (>1000亿)</option>
+                        <option>中型股 (100-1000亿)</option>
+                        <option>小型股 (<100亿)< /option>
+                    </select>
+                </div>
+
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="watchlist-only">
+                    <label class="form-check-label" for="watchlist-only">
+                        仅关注列表
+                    </label>
+                </div>
+
+                <button class="btn btn-primary w-100">应用筛选</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧财务分析详情 -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <h5 class="mb-0">苹果公司 (AAPL)</h5>
+                    <small class="text-muted">纳斯达克 | 科技行业</small>
+                </div>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary me-2" id="refresh-financial">
+                        <i class="fas fa-sync-alt"></i> 刷新
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" id="export-financial">
+                        <i class="fas fa-download"></i> 导出
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- 三大报表概览 -->
+                <div class="row mb-4">
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <span><i class="fas fa-file-invoice me-2"></i>利润表</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>营收</span>
+                                    <strong>$120B</strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>净利润</span>
+                                    <strong class="text-success">$25B</strong>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>毛利率</span>
+                                    <strong class="text-success">42%</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <span><i class="fas fa-balance-scale me-2"></i>资产负债表</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>总资产</span>
+                                    <strong>$350B</strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>总负债</span>
+                                    <strong>$260B</strong>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>股东权益</span>
+                                    <strong>$90B</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <span><i class="fas fa-cash-register me-2"></i>现金流量表</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>经营现金流</span>
+                                    <strong class="text-success">$110B</strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>投资现金流</span>
+                                    <strong class="text-danger">-$90B</strong>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>融资现金流</span>
+                                    <strong class="text-danger">-$30B</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 核心指标趋势图 -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <span><i class="fas fa-chart-line me-2"></i>核心指标趋势</span>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown">
+                                近五年
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#">近三年</a></li>
+                                <li><a class="dropdown-item" href="#">近五年</a></li>
+                                <li><a class="dropdown-item" href="#">近十年</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="metricsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Agent异常提示 -->
+                <div class="card">
+                    <div class="card-header">
+                        <span><i class="fas fa-robot me-2"></i>Agent财务异常提示</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-warning">
+                            <h6 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>潜在风险提示</h6>
+                            <p class="mb-2">检测到以下财务异常：</p>
+                            <ul class="mb-2">
+                                <li>应收账款周转率连续两年下降，可能存在回款风险</li>
+                                <li>研发费用占营收比例低于行业平均水平</li>
+                            </ul>
+                            <p class="mb-0"><strong>建议：</strong>关注公司现金流状况，建议进一步分析应收账款质量。</p>
+                        </div>
+
+                        <div class="alert alert-success">
+                            <h6 class="alert-heading"><i class="fas fa-thumbs-up me-2"></i>积极信号</h6>
+                            <p class="mb-2">检测到以下积极信号：</p>
+                            <ul class="mb-0">
+                                <li>净利润率持续提升，盈利能力增强</li>
+                                <li>自由现金流充足，财务状况健康</li>
+                                <li>ROE保持在行业领先水平</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // 绑定事件
+        document.getElementById('search-company').addEventListener('click', searchCompany);
+        document.getElementById('company-search').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                searchCompany();
+            }
+        });
+        document.getElementById('refresh-financial').addEventListener('click', refreshFinancial);
+        document.getElementById('export-financial').addEventListener('click', exportFinancial);
+
+        // 初始化图表
+        initMetricsChart();
+    });
+
+    function searchCompany() {
+        const searchTerm = document.getElementById('company-search').value.trim();
+        if (!searchTerm) {
+            showMessage('请输入公司名称或代码', 'warning');
+            return;
+        }
+
+        showMessage('搜索功能将在后续版本中实现', 'info');
+    }
+
+    function refreshFinancial() {
+        showMessage('财务数据已刷新', 'success');
+    }
+
+    function exportFinancial() {
+        showMessage('导出功能将在后续版本中实现', 'info');
+    }
+
+    function initMetricsChart() {
+        const ctx = document.getElementById('metricsChart');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['2019', '2020', '2021', '2022', '2023'],
+                    datasets: [
+                        {
+                            label: '营收增长率',
+                            data: [5.2, 6.8, 8.1, 7.5, 9.2],
+                            borderColor: '#2563eb',
+                            backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: '净利润率',
+                            data: [22.1, 24.5, 26.8, 25.9, 28.2],
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: '负债率',
+                            data: [72.5, 70.1, 68.9, 67.2, 65.8],
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false
+                        }
+                    }
+                }
+            });
+        }
+    }
+</script>
+{% endblock %}

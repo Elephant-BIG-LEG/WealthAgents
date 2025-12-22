@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}数据采集 - 智能投研分析平台{% endblock %}
+{% block page_title %}数据采集{% endblock %}
+{% block active_page %}data-collection{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- 采集配置区 -->
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header">
+                <span><i class="fas fa-cog"></i> 采集配置</span>
+            </div>
+            <div class="card-body">
+                <form id="collection-form">
+                    <div class="mb-3">
+                        <label class="form-label">数据源类型</label>
+                        <select class="form-select" id="source-type">
+                            <option value="web">网页采集</option>
+                            <option value="api">API接口</option>
+                            <option value="file">文件上传</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">数据源名称</label>
+                        <input type="text" class="form-control" id="source-name" placeholder="请输入数据源名称">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">网址/路径</label>
+                        <input type="text" class="form-control" id="source-url" placeholder="https://example.com">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">采集频率</label>
+                        <select class="form-select" id="collection-frequency">
+                            <option value="once">一次性采集</option>
+                            <option value="daily">每日</option>
+                            <option value="hourly">每小时</option>
+                            <option value="realtime">实时监控</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">关键词筛选（可选）</label>
+                        <input type="text" class="form-control" id="keywords" placeholder="多个关键词用逗号分隔">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">股票代码（可选）</label>
+                        <input type="text" class="form-control" id="stock-codes" placeholder="多个代码用逗号分隔">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100" id="start-collection-btn">
+                        <i class="fas fa-play me-2"></i>开始采集
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <span><i class="fas fa-info-circle"></i> 采集说明</span>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>支持自动翻页采集</li>
+                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>采集完成后自动进行AI分析</li>
+                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>支持定时任务和实时监控</li>
+                    <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>采集结果将保存到数据库</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- 采集任务列表 -->
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header">
+                <span><i class="fas fa-tasks"></i> 采集任务列表</span>
+                <button class="btn btn-sm btn-outline-primary" id="refresh-tasks">
+                    <i class="fas fa-sync-alt"></i> 刷新
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>任务ID</th>
+                                <th>数据源</th>
+                                <th>状态</th>
+                                <th>时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tasks-table-body">
+                            <tr>
+                                <td colspan="5" class="text-center">
+                                    <div class="py-5">
+                                        <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                                        <p>加载中...</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // 绑定事件
+        document.getElementById('collection-form').addEventListener('submit', startCollection);
+        document.getElementById('refresh-tasks').addEventListener('click', loadTasks);
+
+        // 初始化加载任务列表
+        loadTasks();
+    });
+
+    function startCollection(e) {
+        e.preventDefault();
+
+        const sourceType = document.getElementById('source-type').value;
+        const sourceName = document.getElementById('source-name').value;
+        const sourceUrl = document.getElementById('source-url').value;
+        const frequency = document.getElementById('collection-frequency').value;
+        const keywords = document.getElementById('keywords').value;
+        const stockCodes = document.getElementById('stock-codes').value;
+
+        // 验证必填字段
+        if (!sourceName || !sourceUrl) {
+            showMessage('请填写数据源名称和网址', 'warning');
+            return;
+        }
+
+        // 禁用按钮并显示加载状态
+        const btn = document.getElementById('start-collection-btn');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>采集中...';
+        btn.disabled = true;
+
+        // 发送采集请求
+        const formData = new FormData();
+        formData.append('source_type', sourceType);
+        formData.append('source_name', sourceName);
+        formData.append('source_url', sourceUrl);
+        formData.append('frequency', frequency);
+        formData.append('keywords', keywords);
+        formData.append('stock_codes', stockCodes);
+
+        fetch('/collect', {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage('采集任务已启动，采集到 ' + data.data_count + ' 条数据', 'success');
+                    // 重新加载任务列表
+                    loadTasks();
+                    // 跳转到分析页面
+                    setTimeout(() => {
+                        window.location.href = '/recent-hotspots';
+                    }, 2000);
+                } else {
+                    showMessage('采集失败: ' + data.message, 'danger');
+                }
+            })
+            .catch(error => {
+                showMessage('请求失败: ' + error.message, 'danger');
+            })
+            .finally(() => {
+                // 恢复按钮状态
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            });
+    }
+
+    function loadTasks() {
+        const tbody = document.getElementById('tasks-table-body');
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center"><div class="py-5"><i class="fas fa-spinner fa-spin fa-2x mb-3"></i><p>加载中...</p></div></td></tr>';
+
+        fetch('/get_data')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.data) {
+                    renderTasks(data.data);
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无采集任务</td></tr>';
+                }
+            })
+            .catch(error => {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">加载失败: ' + error.message + '</td></tr>';
+            });
+    }
+
+    function renderTasks(tasks) {
+        const tbody = document.getElementById('tasks-table-body');
+
+        if (!tasks || tasks.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无采集任务</td></tr>';
+            return;
+        }
+
+        let html = '';
+        tasks.slice(0, 10).forEach((task, index) => {
+            const taskId = index + 1;
+            const status = 'completed';
+            const statusClass = 'status-success';
+            const statusText = '已完成';
+            const timestamp = task.collection_time || task.date || new Date().toLocaleString();
+
+            html += `
+            <tr>
+                <td>${taskId}</td>
+                <td>${task.source || '未知'}</td>
+                <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                <td>${timestamp}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary view-analysis" data-id="${taskId}">
+                        <i class="fas fa-chart-bar"></i> 查看分析
+                    </button>
+                </td>
+            </tr>
+        `;
+        });
+
+        tbody.innerHTML = html;
+
+        // 绑定查看分析按钮事件
+        document.querySelectorAll('.view-analysis').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const taskId = this.getAttribute('data-id');
+                window.location.href = '/recent-hotspots';
+            });
+        });
+    }
+</script>
+{% endblock %}

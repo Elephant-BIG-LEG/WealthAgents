@@ -1,0 +1,486 @@
+{% extends "base.html" %}
+
+{% block title %}设置 - 智能投研分析平台{% endblock %}
+{% block page_title %}设置{% endblock %}
+{% block active_page %}settings{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-3">
+        <div class="card">
+            <div class="card-header">
+                <span><i class="fas fa-cog"></i> 设置菜单</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    <a href="#" class="list-group-item list-group-item-action active" data-tab="account">
+                        <i class="fas fa-user me-2"></i>账户设置
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action" data-tab="notification">
+                        <i class="fas fa-bell me-2"></i>通知设置
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action" data-tab="data-source">
+                        <i class="fas fa-database me-2"></i>数据源管理
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action" data-tab="agent-config">
+                        <i class="fas fa-robot me-2"></i>Agent配置
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action" data-tab="api">
+                        <i class="fas fa-key me-2"></i>API密钥
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action" data-tab="system">
+                        <i class="fas fa-server me-2"></i>系统设置
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-9">
+        <!-- 账户设置 -->
+        <div class="tab-content" id="settings-tabs">
+            <div class="tab-pane fade show active" id="account-tab">
+                <div class="card">
+                    <div class="card-header">
+                        <span><i class="fas fa-user"></i> 账户信息</span>
+                    </div>
+                    <div class="card-body">
+                        <form>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">用户名</label>
+                                    <input type="text" class="form-control" value="investor_user">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">邮箱</label>
+                                    <input type="email" class="form-control" value="user@example.com">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">姓名</label>
+                                    <input type="text" class="form-control" value="张三">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">手机号</label>
+                                    <input type="tel" class="form-control" value="138****8888">
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">公司/机构</label>
+                                <input type="text" class="form-control" value="某某投资公司">
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">保存更改</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <span><i class="fas fa-lock"></i> 密码安全</span>
+                    </div>
+                    <div class="card-body">
+                        <form>
+                            <div class="mb-3">
+                                <label class="form-label">当前密码</label>
+                                <input type="password" class="form-control">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">新密码</label>
+                                <input type="password" class="form-control">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">确认新密码</label>
+                                <input type="password" class="form-control">
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">修改密码</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 通知设置 -->
+            <div class="tab-pane fade" id="notification-tab">
+                <div class="card">
+                    <div class="card-header">
+                        <span><i class="fas fa-bell"></i> 通知偏好</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-4">
+                            <h6>邮件通知</h6>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="email-enable" checked>
+                                <label class="form-check-label" for="email-enable">启用邮件通知</label>
+                            </div>
+
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="email-daily-report" checked>
+                                <label class="form-check-label" for="email-daily-report">每日报告</label>
+                            </div>
+
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="email-alerts" checked>
+                                <label class="form-check-label" for="email-alerts">重要警报</label>
+                            </div>
+
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="email-agent-results">
+                                <label class="form-check-label" for="email-agent-results">Agent分析结果</label>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <h6>短信通知</h6>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="sms-enable">
+                                <label class="form-check-label" for="sms-enable">启用短信通知</label>
+                            </div>
+
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="sms-alerts" checked>
+                                <label class="form-check-label" for="sms-alerts">紧急警报</label>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <h6>应用内通知</h6>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="app-enable" checked>
+                                <label class="form-check-label" for="app-enable">启用应用内通知</label>
+                            </div>
+
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="app-daily-report" checked>
+                                <label class="form-check-label" for="app-daily-report">每日报告提醒</label>
+                            </div>
+
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="app-agent-results" checked>
+                                <label class="form-check-label" for="app-agent-results">Agent分析完成提醒</label>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary">保存通知设置</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 数据源管理 -->
+            <div class="tab-pane fade" id="data-source-tab">
+                <div class="card">
+                    <div class="card-header">
+                        <span><i class="fas fa-database"></i> 数据源配置</span>
+                        <button class="btn btn-sm btn-outline-primary" id="add-data-source">
+                            <i class="fas fa-plus"></i> 添加数据源
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>数据源名称</th>
+                                        <th>类型</th>
+                                        <th>状态</th>
+                                        <th>最后更新</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>东方财富网</td>
+                                        <td>网页采集</td>
+                                        <td><span class="status-badge status-success">正常</span></td>
+                                        <td>2023-12-15 09:30</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-primary edit-source" title="编辑">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-outline-danger delete-source" title="删除">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>新浪财经</td>
+                                        <td>API接口</td>
+                                        <td><span class="status-badge status-warning">警告</span></td>
+                                        <td>2023-12-14 16:45</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-primary edit-source" title="编辑">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-outline-danger delete-source" title="删除">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>自定义数据文件</td>
+                                        <td>文件上传</td>
+                                        <td><span class="status-badge status-success">正常</span></td>
+                                        <td>2023-12-10 14:20</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-primary edit-source" title="编辑">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-outline-danger delete-source" title="删除">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Agent配置 -->
+            <div class="tab-pane fade" id="agent-config-tab">
+                <div class="card">
+                    <div class="card-header">
+                        <span><i class="fas fa-robot"></i> Agent全局配置</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">默认LLM模型</label>
+                            <select class="form-select">
+                                <option>Qwen-Plus</option>
+                                <option selected>Qwen-Max</option>
+                                <option>Qwen-Turbo</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">最大并发任务数</label>
+                            <input type="number" class="form-control" value="5" min="1" max="20">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">任务超时时间(分钟)</label>
+                            <input type="number" class="form-control" value="30" min="5" max="120">
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="auto-retry" checked>
+                            <label class="form-check-label" for="auto-retry">任务失败后自动重试</label>
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="save-intermediate" checked>
+                            <label class="form-check-label" for="save-intermediate">保存中间结果</label>
+                        </div>
+
+                        <button class="btn btn-primary">保存Agent配置</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API密钥 -->
+            <div class="tab-pane fade" id="api-tab">
+                <div class="card">
+                    <div class="card-header">
+                        <span><i class="fas fa-key"></i> API密钥管理</span>
+                        <button class="btn btn-sm btn-outline-primary" id="generate-api-key">
+                            <i class="fas fa-plus"></i> 生成新密钥
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            API密钥用于第三方应用集成和自动化脚本调用
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>密钥名称</th>
+                                        <th>创建时间</th>
+                                        <th>最后使用</th>
+                                        <th>状态</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>主应用密钥</td>
+                                        <td>2023-12-01 10:30</td>
+                                        <td>2023-12-15 09:15</td>
+                                        <td><span class="status-badge status-success">启用</span></td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-primary copy-key" title="复制">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                                <button class="btn btn-outline-warning disable-key" title="禁用">
+                                                    <i class="fas fa-ban"></i>
+                                                </button>
+                                                <button class="btn btn-outline-danger delete-key" title="删除">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>数据同步密钥</td>
+                                        <td>2023-12-10 14:20</td>
+                                        <td>从未使用</td>
+                                        <td><span class="status-badge status-warning">未启用</span></td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-primary copy-key" title="复制">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                                <button class="btn btn-outline-success enable-key" title="启用">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                                <button class="btn btn-outline-danger delete-key" title="删除">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 系统设置 -->
+            <div class="tab-pane fade" id="system-tab">
+                <div class="card">
+                    <div class="card-header">
+                        <span><i class="fas fa-server"></i> 系统配置</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">数据存储位置</label>
+                            <input type="text" class="form-control" value="/data/wealth_agents" readonly>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">日志级别</label>
+                            <select class="form-select">
+                                <option>DEBUG</option>
+                                <option selected>INFO</option>
+                                <option>WARNING</option>
+                                <option>ERROR</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">备份策略</label>
+                            <select class="form-select">
+                                <option>每日备份</option>
+                                <option selected>每周备份</option>
+                                <option>每月备份</option>
+                                <option>手动备份</option>
+                            </select>
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="auto-backup" checked>
+                            <label class="form-check-label" for="auto-backup">自动备份</label>
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="enable-cache" checked>
+                            <label class="form-check-label" for="enable-cache">启用缓存</label>
+                        </div>
+
+                        <button class="btn btn-primary">保存系统设置</button>
+
+                        <hr class="my-4">
+
+                        <div class="d-flex justify-content-between">
+                            <button class="btn btn-warning" id="clear-cache">
+                                <i class="fas fa-broom me-2"></i>清理缓存
+                            </button>
+                            <button class="btn btn-danger" id="reset-system">
+                                <i class="fas fa-undo me-2"></i>恢复默认设置
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // 绑定设置菜单切换
+        document.querySelectorAll('[data-tab]').forEach(item => {
+            item.addEventListener('click', function (e) {
+                e.preventDefault();
+                const tab = this.getAttribute('data-tab');
+
+                // 更新菜单激活状态
+                document.querySelectorAll('[data-tab]').forEach(el => {
+                    el.classList.remove('active');
+                });
+                this.classList.add('active');
+
+                // 显示对应的tab内容
+                document.querySelectorAll('.tab-pane').forEach(el => {
+                    el.classList.remove('show', 'active');
+                });
+                document.getElementById(tab + '-tab').classList.add('show', 'active');
+            });
+        });
+
+        // 绑定各种按钮事件
+        document.getElementById('add-data-source').addEventListener('click', function () {
+            showMessage('添加数据源功能将在后续版本中实现', 'info');
+        });
+
+        document.getElementById('generate-api-key').addEventListener('click', function () {
+            showMessage('API密钥生成功能在后续版本中实现', 'info');
+        });
+
+        document.getElementById('clear-cache').addEventListener('click', function () {
+            if (confirm('确定要清理缓存吗？')) {
+                showMessage('缓存已清理', 'success');
+            }
+        });
+
+        document.getElementById('reset-system').addEventListener('click', function () {
+            if (confirm('确定要恢复默认设置吗？这将丢失所有自定义配置。')) {
+                showMessage('系统设置已恢复为默认值', 'success');
+            }
+        });
+
+        // 表格内按钮事件
+        document.querySelectorAll('.edit-source').forEach(btn => {
+            btn.addEventListener('click', function () {
+                showMessage('编辑数据源功能将在后续版本中实现', 'info');
+            });
+        });
+
+        document.querySelectorAll('.delete-source').forEach(btn => {
+            btn.addEventListener('click', function () {
+                if (confirm('确定要删除此数据源吗？')) {
+                    showMessage('数据源已删除', 'success');
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}近期热点 - 智能投研分析平台{% endblock %}
+{% block page_title %}近期热点{% endblock %}
+{% block active_page %}recent-hotspots{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- 左侧热点列表 -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <span><i class="fas fa-list"></i> 热点列表</span>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                        data-bs-toggle="dropdown">
+                        <i class="fas fa-filter"></i> 筛选
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" data-filter="all">全部</a></li>
+                        <li><a class="dropdown-item" href="#" data-filter="today">今天</a></li>
+                        <li><a class="dropdown-item" href="#" data-filter="week">本周</a></li>
+                        <li><a class="dropdown-item" href="#" data-filter="month">本月</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush" id="hotspots-list">
+                    <div class="text-center py-5">
+                        <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                        <p>加载中...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧分析详情 -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <span><i class="fas fa-chart-bar"></i> 热点分析详情</span>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary me-2" id="refresh-analysis">
+                        <i class="fas fa-sync-alt"></i> 刷新
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" id="export-analysis">
+                        <i class="fas fa-download"></i> 导出
+                    </button>
+                </div>
+            </div>
+            <div class="card-body" id="analysis-detail">
+                <div class="text-center py-5">
+                    <i class="fas fa-info-circle fa-2x mb-3 text-muted"></i>
+                    <p class="text-muted">请选择左侧热点查看详情</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentHotspots = [];
+
+    document.addEventListener('DOMContentLoaded', function () {
+        // 绑定事件
+        document.getElementById('refresh-analysis').addEventListener('click', loadHotspots);
+        document.getElementById('export-analysis').addEventListener('click', exportAnalysis);
+
+        // 绑定筛选事件
+        document.querySelectorAll('[data-filter]').forEach(item => {
+            item.addEventListener('click', function (e) {
+                e.preventDefault();
+                const filter = this.getAttribute('data-filter');
+                filterHotspots(filter);
+            });
+        });
+
+        // 初始化加载热点数据
+        loadHotspots();
+    });
+
+    function loadHotspots() {
+        const listContainer = document.getElementById('hotspots-list');
+        listContainer.innerHTML = '<div class="text-center py-5"><i class="fas fa-spinner fa-spin fa-2x mb-3"></i><p>加载中...</p></div>';
+
+        fetch('/get_data')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.data) {
+                    currentHotspots = data.data;
+                    renderHotspotsList(data.data);
+                } else {
+                    listContainer.innerHTML = '<div class="text-center py-5 text-muted"><i class="fas fa-info-circle fa-2x mb-3"></i><p>暂无热点数据</p></div>';
+                }
+            })
+            .catch(error => {
+                listContainer.innerHTML = '<div class="text-center py-5 text-danger"><i class="fas fa-exclamation-triangle fa-2x mb-3"></i><p>加载失败: ' + error.message + '</p></div>';
+            });
+    }
+
+    function renderHotspotsList(hotspots) {
+        const listContainer = document.getElementById('hotspots-list');
+
+        if (!hotspots || hotspots.length === 0) {
+            listContainer.innerHTML = '<div class="text-center py-5 text-muted"><i class="fas fa-info-circle fa-2x mb-3"></i><p>暂无热点数据</p></div>';
+            return;
+        }
+
+        let html = '';
+        hotspots.forEach((hotspot, index) => {
+            const sentiment = hotspot.sentiment || 'neutral';
+            const sentimentClass = sentiment === 'positive' ? 'text-success' :
+                sentiment === 'negative' ? 'text-danger' : 'text-muted';
+            const sentimentIcon = sentiment === 'positive' ? 'fa-thumbs-up' :
+                sentiment === 'negative' ? 'fa-thumbs-down' : 'fa-minus';
+
+            html += `
+            <a href="#" class="list-group-item list-group-item-action hotspot-item" data-id="${index}">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="mb-1">${hotspot.topic || '未命名热点'}</h6>
+                        <small class="text-muted">${hotspot.source || '未知来源'}</small>
+                    </div>
+                    <span class="${sentimentClass}"><i class="fas ${sentimentIcon}"></i></span>
+                </div>
+                <p class="mb-1 mt-2 small">${hotspot.market_summary || '暂无摘要'}</p>
+                <small class="text-muted">${hotspot.date || new Date().toLocaleDateString()}</small>
+            </a>
+        `;
+        });
+
+        listContainer.innerHTML = html;
+
+        // 绑定点击事件
+        document.querySelectorAll('.hotspot-item').forEach(item => {
+            item.addEventListener('click', function (e) {
+                e.preventDefault();
+                const id = this.getAttribute('data-id');
+                showHotspotDetail(currentHotspots[id]);
+
+                // 更新选中状态
+                document.querySelectorAll('.hotspot-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+    }
+
+    function showHotspotDetail(hotspot) {
+        const detailContainer = document.getElementById('analysis-detail');
+
+        if (!hotspot) {
+            detailContainer.innerHTML = '<div class="text-center py-5 text-muted"><i class="fas fa-info-circle fa-2x mb-3"></i><p>请选择热点查看详情</p></div>';
+            return;
+        }
+
+        const sentiment = hotspot.sentiment || 'neutral';
+        const sentimentText = sentiment === 'positive' ? '利好' :
+            sentiment === 'negative' ? '利空' : '中性';
+        const sentimentClass = sentiment === 'positive' ? 'bg-success' :
+            sentiment === 'negative' ? 'bg-danger' : 'bg-secondary';
+
+        detailContainer.innerHTML = `
+        <div class="row">
+            <div class="col-md-8">
+                <h4>${hotspot.topic || '未命名热点'}</h4>
+                <div class="mb-3">
+                    <span class="badge ${sentimentClass}">${sentimentText}</span>
+                    <small class="text-muted ms-2">${hotspot.date || new Date().toLocaleDateString()} • ${hotspot.source || '未知来源'}</small>
+                </div>
+                
+                <h6 class="mt-4"><i class="fas fa-file-alt me-2"></i>事件摘要</h6>
+                <p>${hotspot.market_summary || '暂无摘要'}</p>
+                
+                <h6 class="mt-4"><i class="fas fa-industry me-2"></i>涉及行业/公司</h6>
+                <div class="mb-3">
+                    ${hotspot.companies ?
+                hotspot.companies.map(company => `<span class="badge bg-primary me-2">${company}</span>`).join('') :
+                '<span class="text-muted">暂无相关信息</span>'}
+                </div>
+                
+                <h6 class="mt-4"><i class="fas fa-lightbulb me-2"></i>Agent判断</h6>
+                <div class="alert alert-info">
+                    <p class="mb-1"><strong>投资建议：</strong>${hotspot.investment_advice || '暂无建议'}</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <span><i class="fas fa-chart-pie"></i> 影响分析</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="impactChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <span><i class="fas fa-clock"></i> 时间线</span>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <small class="text-muted">采集时间</small>
+                                <br><strong>${hotspot.collection_time || hotspot.date || '未知'}</strong>
+                            </li>
+                            <li class="mb-2">
+                                <small class="text-muted">分析时间</small>
+                                <br><strong>${hotspot.analysis_time || '未知'}</strong>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+        // 初始化图表
+        initImpactChart();
+    }
+
+    function initImpactChart() {
+        const ctx = document.getElementById('impactChart');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['积极影响', '消极影响', '中性影响'],
+                    datasets: [{
+                        data: [45, 25, 30],
+                        backgroundColor: [
+                            '#10b981',
+                            '#ef4444',
+                            '#6b7280'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    function filterHotspots(filter) {
+        // 简单实现筛选功能
+        loadHotspots();
+    }
+
+    function exportAnalysis() {
+        showMessage('导出功能将在后续版本中实现', 'info');
+    }
+</script>
+{% endblock %}

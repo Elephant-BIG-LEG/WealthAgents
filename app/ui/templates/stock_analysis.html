@@ -1,0 +1,469 @@
+{% extends "base.html" %}
+
+{% block title %}股票分析 - 智能投研分析平台{% endblock %}
+{% block page_title %}股票分析{% endblock %}
+{% block active_page %}stock-analysis{% endblock %}
+
+{% block content %}
+<!-- 股票搜索和选择 -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <input type="text" class="form-control" id="stock-search" placeholder="输入股票代码或名称">
+                    <button class="btn btn-outline-secondary" type="button" id="search-stock">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="d-flex flex-wrap gap-2 mt-2 mt-md-0" id="selected-stocks">
+                    <!-- 已选择的股票将在这里显示 -->
+                    <span class="text-muted">请选择股票进行分析</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 分析选项卡 -->
+<ul class="nav nav-tabs mb-4" id="analysis-tabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="technical-tab" data-bs-toggle="tab" data-bs-target="#technical"
+            type="button">
+            <i class="fas fa-chart-line me-2"></i>技术面
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="fundamental-tab" data-bs-toggle="tab" data-bs-target="#fundamental" type="button">
+            <i class="fas fa-building me-2"></i>基本面
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="capital-tab" data-bs-toggle="tab" data-bs-target="#capital" type="button">
+            <i class="fas fa-money-bill-wave me-2"></i>资金面
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="news-tab" data-bs-toggle="tab" data-bs-target="#news" type="button">
+            <i class="fas fa-newspaper me-2"></i>新闻与情绪
+        </button>
+    </li>
+</ul>
+
+<!-- Tab内容 -->
+<div class="tab-content" id="analysis-tab-content">
+    <!-- 技术面分析 -->
+    <div class="tab-pane fade show active" id="technical" role="tabpanel">
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <span><i class="fas fa-chart-line"></i> K线图</span>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown">
+                                月线
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#">日线</a></li>
+                                <li><a class="dropdown-item" href="#">周线</a></li>
+                                <li><a class="dropdown-item" href="#">月线</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="klineChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <span><i class="fas fa-calculator"></i> 技术指标</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>RSI(14)</span>
+                            <strong class="text-success">62.5</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>MACD</span>
+                            <strong class="text-danger">-0.45</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>MA5</span>
+                            <strong>45.23</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>MA20</span>
+                            <strong>42.67</strong>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>布林带</span>
+                            <strong>中轨</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span><i class="fas fa-lightbulb"></i> 分析结论</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-0">
+                            <h6 class="alert-heading">短期趋势</h6>
+                            <p class="mb-0">股价处于上升通道，建议持股观望。MACD出现金叉信号，RSI处于合理区间。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 基本面分析 -->
+    <div class="tab-pane fade" id="fundamental" role="tabpanel">
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <span><i class="fas fa-chart-bar"></i> 财务指标趋势</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="financialChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <span><i class="fas fa-file-invoice-dollar"></i> 核心财务数据</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>市盈率(P/E)</span>
+                            <strong>15.2</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>市净率(P/B)</span>
+                            <strong>2.1</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>ROE</span>
+                            <strong class="text-success">12.5%</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>负债率</span>
+                            <strong class="text-success">35.2%</strong>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>毛利率</span>
+                            <strong class="text-success">42.8%</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <span><i class="fas fa-lightbulb"></i> 分析结论</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-success mb-0">
+                            <h6 class="alert-heading">估值水平</h6>
+                            <p class="mb-0">公司基本面良好，估值合理。ROE持续提升，负债率处于健康水平。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 资金面分析 -->
+    <div class="tab-pane fade" id="capital" role="tabpanel">
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <span><i class="fas fa-money-bill-wave"></i> 资金流向图</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="capitalChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <span><i class="fas fa-coins"></i> 资金数据</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>主力净流入</span>
+                            <strong class="text-success">+1.2亿</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>散户净流出</span>
+                            <strong class="text-danger">-0.8亿</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>北向资金</span>
+                            <strong class="text-success">+0.5亿</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>融资余额</span>
+                            <strong>15.6亿</strong>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>融券余额</span>
+                            <strong>0.3亿</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <span><i class="fas fa-lightbulb"></i> 分析结论</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-warning mb-0">
+                            <h6 class="alert-heading">资金动向</h6>
+                            <p class="mb-0">主力资金持续流入，散户资金流出，显示机构看好后市。建议关注资金流入持续性。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新闻与情绪分析 -->
+    <div class="tab-pane fade" id="news" role="tabpanel">
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <span><i class="fas fa-newspaper"></i> 相关新闻</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="list-group">
+                            <a href="#" class="list-group-item list-group-item-action">
+                                <div class="d-flex justify-content-between">
+                                    <h6 class="mb-1">公司发布最新财报，净利润同比增长25%</h6>
+                                    <small class="text-muted">2小时前</small>
+                                </div>
+                                <p class="mb-1">公司今日发布2023年年度报告，实现营业收入120亿元，同比增长18%，净利润15亿元，同比增长25%。</p>
+                                <small class="text-success"><i class="fas fa-thumbs-up me-1"></i> 利好</small>
+                            </a>
+                            <a href="#" class="list-group-item list-group-item-action">
+                                <div class="d-flex justify-content-between">
+                                    <h6 class="mb-1">行业政策利好，公司有望受益</h6>
+                                    <small class="text-muted">1天前</small>
+                                </div>
+                                <p class="mb-1">国家发布新一轮产业扶持政策，公司将作为重点企业获得税收优惠和技术支持。</p>
+                                <small class="text-success"><i class="fas fa-thumbs-up me-1"></i> 利好</small>
+                            </a>
+                            <a href="#" class="list-group-item list-group-item-action">
+                                <div class="d-flex justify-content-between">
+                                    <h6 class="mb-1">原材料价格上涨，成本压力增加</h6>
+                                    <small class="text-muted">3天前</small>
+                                </div>
+                                <p class="mb-1">受国际大宗商品价格上涨影响，公司主要原材料成本上升5-8%。</p>
+                                <small class="text-danger"><i class="fas fa-thumbs-down me-1"></i> 利空</small>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <span><i class="fas fa-smile"></i> 市场情绪分析</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center mb-4">
+                            <div class="display-4 text-success">72%</div>
+                            <div class="text-muted">积极情绪占比</div>
+                        </div>
+
+                        <div class="progress mb-3">
+                            <div class="progress-bar bg-success" role="progressbar" style="width: 72%"></div>
+                            <div class="progress-bar bg-warning" role="progressbar" style="width: 18%"></div>
+                            <div class="progress-bar bg-danger" role="progressbar" style="width: 10%"></div>
+                        </div>
+
+                        <div class="d-flex justify-content-between small">
+                            <span class="text-success">积极(72%)</span>
+                            <span class="text-warning">中性(18%)</span>
+                            <span class="text-danger">消极(10%)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <span><i class="fas fa-lightbulb"></i> 情绪结论</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-0">
+                            <h6 class="alert-heading">市场情绪</h6>
+                            <p class="mb-0">市场对该股票情绪总体积极，主要受利好财报和政策影响。建议关注后续消息面变化。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // 初始化图表
+        initCharts();
+
+        // 绑定搜索事件
+        document.getElementById('search-stock').addEventListener('click', searchStock);
+        document.getElementById('stock-search').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                searchStock();
+            }
+        });
+    });
+
+    function searchStock() {
+        const searchTerm = document.getElementById('stock-search').value.trim();
+        if (!searchTerm) {
+            showMessage('请输入股票代码或名称', 'warning');
+            return;
+        }
+
+        // 模拟搜索结果
+        const selectedStocksContainer = document.getElementById('selected-stocks');
+        selectedStocksContainer.innerHTML = `
+        <span class="badge bg-primary">AAPL 苹果公司 <button type="button" class="btn-close btn-close-white ms-2" aria-label="Remove"></button></span>
+        <span class="badge bg-primary">GOOGL 谷歌 <button type="button" class="btn-close btn-close-white ms-2" aria-label="Remove"></button></span>
+    `;
+
+        // 绑定删除事件
+        selectedStocksContainer.querySelectorAll('.btn-close').forEach(btn => {
+            btn.addEventListener('click', function () {
+                this.parentElement.remove();
+            });
+        });
+
+        showMessage('已添加股票到分析列表', 'success');
+    }
+
+    function initCharts() {
+        // K线图
+        const klineCtx = document.getElementById('klineChart');
+        if (klineCtx) {
+            new Chart(klineCtx, {
+                type: 'line',
+                data: {
+                    labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
+                    datasets: [{
+                        label: '股价',
+                        data: [40, 42, 45, 43, 46, 48],
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false
+                        }
+                    }
+                }
+            });
+        }
+
+        // 财务指标图
+        const financialCtx = document.getElementById('financialChart');
+        if (financialCtx) {
+            new Chart(financialCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+                    datasets: [
+                        {
+                            label: '营收(亿)',
+                            data: [100, 120, 115, 130],
+                            backgroundColor: '#10b981'
+                        },
+                        {
+                            label: '净利润(亿)',
+                            data: [8, 12, 10, 15],
+                            backgroundColor: '#2563eb'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // 资金流向图
+        const capitalCtx = document.getElementById('capitalChart');
+        if (capitalCtx) {
+            new Chart(capitalCtx, {
+                type: 'line',
+                data: {
+                    labels: ['周一', '周二', '周三', '周四', '周五'],
+                    datasets: [
+                        {
+                            label: '主力资金',
+                            data: [1.2, 1.5, 0.8, 2.1, 1.8],
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: '散户资金',
+                            data: [-0.5, -0.8, -0.3, -1.2, -0.9],
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+        }
+    }
+</script>
+{% endblock %}

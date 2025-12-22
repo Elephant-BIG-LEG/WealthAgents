@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>财富代理数据采集系统</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 25px;
+            height: calc(100vh - 200px);
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-title {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e1e1e1;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            padding: 14px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .stats-card {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .stats-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 10px 0;
+        }
+
+        .stats-label {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .data-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .data-item {
+            padding: 15px;
+            margin-bottom: 12px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            transition: all 0.3s ease;
+        }
+
+        .data-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .data-item:nth-child(even) {
+            background: #e9ecef;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .message.success {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
+            color: white;
+        }
+
+        .message.error {
+            background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
+            color: white;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+        }
+
+        .loading i {
+            font-size: 2rem;
+            margin-bottom: 15px;
+            display: block;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+        }
+
+        /* 滚动条样式 */
+        .data-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .data-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .data-container::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+        }
+
+        .data-container::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+
+            header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-spider"></i> 财富代理数据采集系统</h1>
+            <p>高效、智能的网页数据采集与分析平台</p>
+        </header>
+
+        <div class="main-grid">
+            <div class="panel">
+                <h2 class="panel-title"><i class="fas fa-cog"></i> 配置面板</h2>
+
+                <div class="stats-card">
+                    <div class="stats-label">已采集数据条数</div>
+                    <div class="stats-number" id="data_count">0</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="source_type"><i class="fas fa-database"></i> 数据源类型</label>
+                    <select id="source_type">
+                        <option value="eastmoney">东方财富网</option>
+                        <option value="custom">自定义网址</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="source_url"><i class="fas fa-link"></i> 网址</label>
+                    <input type="text" id="source_url" placeholder="https://example.com"
+                        value="https://finance.eastmoney.com/a/ccjdd.html">
+                </div>
+
+                <div class="form-group">
+                    <label for="source_name"><i class="fas fa-tag"></i> 数据源名称</label>
+                    <input type="text" id="source_name" placeholder="数据源名称" value="东方财富网">
+                </div>
+
+                <button id="collect_btn" type="button" class="btn btn-primary">
+                    <i class="fas fa-play"></i> 开始采集数据
+                </button>
+                <button id="clear_btn" type="button" class="btn btn-danger">
+                    <i class="fas fa-trash-alt"></i> 清空采集结果
+                </button>
+            </div>
+
+            <div class="panel">
+                <h2 class="panel-title"><i class="fas fa-chart-bar"></i> 采集结果</h2>
+
+                <div id="message_area"></div>
+
+                <div class="data-container" id="data_list">
+                    <div style="text-align: center; color: #666; padding: 50px;">
+                        <i class="fas fa-info-circle fa-3x" style="margin-bottom: 20px;"></i>
+                        <p>点击"开始采集数据"按钮获取数据</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>财富代理数据采集系统 v1.0 | © 2025 All Rights Reserved</p>
+        </footer>
+    </div>
+
+    <script>
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function () {
+            // 更新数据统计
+            updateDataStats();
+
+            // 绑定事件监听器
+            document.getElementById('source_type').addEventListener('change', toggleSourceType);
+            document.getElementById('collect_btn').addEventListener('click', collectData);
+            document.getElementById('clear_btn').addEventListener('click', clearData);
+        });
+
+        // 切换数据源类型
+        function toggleSourceType() {
+            const sourceType = document.getElementById('source_type').value;
+            const urlInput = document.getElementById('source_url');
+            const nameInput = document.getElementById('source_name');
+
+            if (sourceType === 'eastmoney') {
+                urlInput.value = 'https://finance.eastmoney.com/';
+                nameInput.value = '东方财富网';
+                urlInput.disabled = true;
+                nameInput.disabled = true;
+            } else {
+                urlInput.value = '';
+                nameInput.value = '';
+                urlInput.disabled = false;
+                nameInput.disabled = false;
+            }
+        }
+
+        // 采集数据
+        function collectData(event) {
+            if (event) event.preventDefault();
+            console.log("点击了开始采集数据按钮");
+
+            const sourceType = document.getElementById('source_type').value;
+            const sourceUrl = document.getElementById('source_url').value;
+            const sourceName = document.getElementById('source_name').value;
+
+            // 验证输入
+            if (!sourceUrl || !sourceName) {
+                showMessage('请填写完整的网址和数据源名称', 'error');
+                return;
+            }
+
+            // 显示加载状态
+            showMessage('<i class="fas fa-spinner"></i> 正在采集数据，请稍候...', 'info');
+            document.getElementById('collect_btn').disabled = true;
+            document.getElementById('collect_btn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> 采集中...';
+
+            // 发送采集请求
+            const formData = new FormData();
+            // 将前端的 source_type 映射到后端期望的类型
+            const backendSourceType = sourceType === 'eastmoney' || sourceType === 'custom' ? 'web' : 'web';
+            formData.append('source_type', backendSourceType);
+            formData.append('source_url', sourceUrl);
+            formData.append('source_name', sourceName);
+
+            fetch('/collect', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => {
+                    console.log('响应状态:', response.status, response.statusText);
+                    if (response.status === 204) {
+                        throw new Error('服务器返回204 No Content，请检查后端日志');
+                    }
+                    if (!response.ok) {
+                        throw new Error(`HTTP错误! 状态: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('收到响应数据:', data);
+                    if (data && data.success) {
+                        showMessage(`<i class="fas fa-check-circle"></i> ${data.message}`, 'success');
+                        updateDataDisplay();
+                    } else {
+                        showMessage(`<i class="fas fa-exclamation-circle"></i> ${data ? data.message : '未知错误'}`, 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('请求错误:', error);
+                    showMessage(`<i class="fas fa-exclamation-triangle"></i> 请求失败: ${error.message}`, 'error');
+                })
+                .finally(() => {
+                    // 恢复按钮状态
+                    document.getElementById('collect_btn').disabled = false;
+                    document.getElementById('collect_btn').innerHTML = '<i class="fas fa-play"></i> 开始采集数据';
+                });
+        }
+
+        // 清空数据
+        function clearData(event) {
+            if (event) event.preventDefault();
+            console.log("点击了清空数据按钮");
+
+            fetch('/clear_data', {
+                method: 'POST'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showMessage(`<i class="fas fa-check-circle"></i> ${data.message}`, 'success');
+                        updateDataDisplay();
+                    } else {
+                        showMessage(`<i class="fas fa-exclamation-circle"></i> ${data.message}`, 'error');
+                    }
+                })
+                .catch(error => {
+                    showMessage(`<i class="fas fa-exclamation-triangle"></i> 请求失败: ${error.message}`, 'error');
+                });
+        }
+
+        // 显示消息
+        function showMessage(message, type) {
+            const messageArea = document.getElementById('message_area');
+            if (type === 'info') {
+                messageArea.innerHTML = `<div class="message">${message}</div>`;
+            } else {
+                messageArea.innerHTML = `<div class="message ${type}">${message}</div>`;
+            }
+
+            // 3秒后自动清除消息（除了错误消息）
+            if (type !== 'error') {
+                setTimeout(() => {
+                    messageArea.innerHTML = '';
+                }, 3000);
+            }
+        }
+
+        // 更新数据显示
+        function updateDataDisplay() {
+            fetch('/get_data')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('从后端获取的数据:', data);
+
+                    // 更新统计数据
+                    document.getElementById('data_count').textContent = data.data_count || 0;
+
+                    // 更新数据列表
+                    const dataList = document.getElementById('data_list');
+                    if (data.data && data.data.length > 0) {
+                        let html = '';
+                        data.data.forEach((item, index) => {
+                            // 确保item是对象格式
+                            let itemData = item;
+
+                            if (typeof itemData === 'object' && itemData !== null) {
+                                html += `
+                                <div class="data-item">
+                                    <strong>${index + 1}.</strong> <br>
+                                    ${itemData.date ? `<strong>日期:</strong> ${itemData.date} <br>` : ''}
+                                    ${itemData.topic ? `<strong>主题:</strong> ${itemData.topic} <br>` : ''}
+                                    ${itemData.market_summary ? `<strong>市场总结:</strong> ${itemData.market_summary} <br>` : ''}
+                                    ${itemData.investment_advice ? `<strong>投资建议:</strong> ${itemData.investment_advice}` : ''}
+                                </div>
+                            `;
+                            } else {
+                                // 对于非对象类型的数据，直接显示
+                                html += `
+                                <div class="data-item">
+                                    <strong>${index + 1}.</strong> ${String(itemData)}
+                                </div>
+                            `;
+                            }
+                        });
+                        dataList.innerHTML = html;
+                    } else {
+                        dataList.innerHTML = `
+                        <div style="text-align: center; color: #666; padding: 50px;">
+                            <i class="fas fa-database fa-3x" style="margin-bottom: 20px;"></i>
+                            <p>暂无采集数据</p>
+                        </div>
+                    `;
+                    }
+                })
+                .catch(error => {
+                    console.error('更新数据失败:', error);
+                    showMessage(`<i class="fas fa-exclamation-triangle"></i> 数据更新失败: ${error.message}`, 'error');
+                });
+        }
+
+        // 更新数据统计
+        function updateDataStats() {
+            fetch('/get_data')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('data_count').textContent = data.data_count;
+                })
+                .catch(error => {
+                    console.error('获取统计数据失败:', error);
+                });
+        }
+    </script>
+</body>
+
+</html>

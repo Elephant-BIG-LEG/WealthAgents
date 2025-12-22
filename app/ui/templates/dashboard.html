@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+
+{% block title %}仪表盘 - 智能投研分析平台{% endblock %}
+{% block page_title %}仪表盘{% endblock %}
+{% block active_page %}dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- 数据统计卡片 -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-database fa-2x text-primary"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h5 class="card-title text-muted">数据总量</h5>
+                        <h3 id="total-data-count">0</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-fire fa-2x text-warning"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h5 class="card-title text-muted">热点话题</h5>
+                        <h3 id="hot-topics-count">0</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-chart-line fa-2x text-success"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h5 class="card-title text-muted">股票分析</h5>
+                        <h3 id="stock-analysis-count">0</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-robot fa-2x text-info"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h5 class="card-title text-muted">Agent任务</h5>
+                        <h3 id="agent-tasks-count">0</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 近期热点摘要 -->
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <span><i class="fas fa-fire"></i> 近期热点摘要</span>
+            </div>
+            <div class="card-body">
+                <div id="recent-hotspots" class="list-group">
+                    <div class="text-center py-5 text-muted">
+                        <i class="fas fa-info-circle fa-2x mb-3"></i>
+                        <p>暂无热点数据</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <span><i class="fas fa-lightbulb"></i> Agent最新结论</span>
+            </div>
+            <div class="card-body">
+                <div id="agent-conclusions">
+                    <div class="text-center py-5 text-muted">
+                        <i class="fas fa-robot fa-2x mb-3"></i>
+                        <p>暂无Agent结论</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <span><i class="fas fa-sync-alt"></i> 最近采集状态</span>
+            </div>
+            <div class="card-body">
+                <div id="recent-collection-status">
+                    <div class="text-center py-3 text-muted">
+                        <p>暂无采集记录</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 快捷入口 -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <span><i class="fas fa-bolt"></i> 快捷入口</span>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <a href="/data-collection" class="btn btn-outline-primary w-100">
+                            <i class="fas fa-plus-circle me-2"></i>新建采集任务
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="/recent-hotspots" class="btn btn-outline-warning w-100">
+                            <i class="fas fa-fire me-2"></i>查看热点分析
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="/stock-analysis" class="btn btn-outline-success w-100">
+                            <i class="fas fa-chart-bar me-2"></i>股票分析
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="/private-agent" class="btn btn-outline-info w-100">
+                            <i class="fas fa-robot me-2"></i>Agent任务
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // 加载仪表盘数据
+        loadDashboardData();
+    });
+
+    function loadDashboardData() {
+        fetch('/api/dashboard/stats')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // 更新统计数据
+                    document.getElementById('total-data-count').textContent = data.stats.total_data || 0;
+                    document.getElementById('hot-topics-count').textContent = data.stats.hot_topics || 0;
+                    document.getElementById('stock-analysis-count').textContent = data.stats.stock_analysis || 0;
+                    document.getElementById('agent-tasks-count').textContent = data.stats.agent_tasks || 0;
+
+                    // 更新热点摘要
+                    updateHotspots(data.recent_hotspots);
+
+                    // 更新Agent结论
+                    updateAgentConclusions(data.agent_conclusions);
+
+                    // 更新采集状态
+                    updateCollectionStatus(data.collection_status);
+                }
+            })
+            .catch(error => {
+                console.error('加载仪表盘数据失败:', error);
+            });
+    }
+
+    function updateHotspots(hotspots) {
+        const container = document.getElementById('recent-hotspots');
+        if (!hotspots || hotspots.length === 0) {
+            container.innerHTML = `
+            <div class="text-center py-5 text-muted">
+                <i class="fas fa-info-circle fa-2x mb-3"></i>
+                <p>暂无热点数据</p>
+            </div>
+        `;
+            return;
+        }
+
+        let html = '';
+        hotspots.slice(0, 5).forEach(item => {
+            html += `
+            <a href="/recent-hotspots/${item.id}" class="list-group-item list-group-item-action">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-1">${item.topic}</h6>
+                        <small class="text-muted">${item.summary || '暂无摘要'}</small>
+                    </div>
+                    <span class="badge bg-primary rounded-pill">${item.source}</span>
+                </div>
+            </a>
+        `;
+        });
+
+        container.innerHTML = html;
+    }
+
+    function updateAgentConclusions(conclusions) {
+        const container = document.getElementById('agent-conclusions');
+        if (!conclusions || conclusions.length === 0) {
+            container.innerHTML = `
+            <div class="text-center py-5 text-muted">
+                <i class="fas fa-robot fa-2x mb-3"></i>
+                <p>暂无Agent结论</p>
+            </div>
+        `;
+            return;
+        }
+
+        let html = '';
+        conclusions.slice(0, 3).forEach(item => {
+            html += `
+            <div class="mb-3 pb-3 border-bottom">
+                <h6 class="mb-2">${item.title}</h6>
+                <p class="mb-1 text-muted small">${item.conclusion}</p>
+                <small class="text-muted">${item.timestamp}</small>
+            </div>
+        `;
+        });
+
+        container.innerHTML = html;
+    }
+
+    function updateCollectionStatus(status) {
+        const container = document.getElementById('recent-collection-status');
+        if (!status || status.length === 0) {
+            container.innerHTML = `
+            <div class="text-center py-3 text-muted">
+                <p>暂无采集记录</p>
+            </div>
+        `;
+            return;
+        }
+
+        let html = '';
+        status.slice(0, 5).forEach(item => {
+            const statusClass = item.status === 'completed' ? 'status-success' :
+                item.status === 'failed' ? 'status-danger' : 'status-warning';
+            const statusText = item.status === 'completed' ? '已完成' :
+                item.status === 'failed' ? '失败' : '进行中';
+
+            html += `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                    <strong>${item.source}</strong>
+                    <br>
+                    <small class="text-muted">${item.timestamp}</small>
+                </div>
+                <span class="status-badge ${statusClass}">${statusText}</span>
+            </div>
+        `;
+        });
+
+        container.innerHTML = html;
+    }
+</script>
+{% endblock %}
