@@ -2,7 +2,7 @@
 财富Agent - 智能投研分析平台
 私人Agent模块 - 私人Agent主类
 整合Plan → Act → Reflect决策闭环
-TODO 修改私人Agent前端响应结果
+TODO
 """
 from typing import Dict, Any, List, Optional
 from .planner import Planner, Task
@@ -82,7 +82,7 @@ class PrivateAgent:
 
     def process_request(self, user_request: str, session_id: Optional[str] = None) -> Dict[str, Any]:
         """
-        处理用户请求 - Plan → Act → Reflect 完整流程
+        处理用户请求 - Plan → Act → Reflect 完整流程 (Iterative Loop)
 
         Args:
             user_request: 用户请求
@@ -96,53 +96,97 @@ class PrivateAgent:
 
         self.logger.info(f"开始处理用户请求 (会话ID: {session_id}): {user_request}")
 
-        # 1. Plan (规划阶段)
-        self.logger.info("开始规划阶段")
-        available_tools = list(self.executor.tools.keys())
-        tasks = self.planner.plan(user_request, available_tools)
+        max_iterations = 3
+        current_iteration = 0
+        final_result = None
+        
+        # 记录每轮执行的状态
+        execution_history = []
 
-        self.logger.info(
-            f"生成 {len(tasks)} 个任务: {[task.name for task in tasks]}")
+        while current_iteration < max_iterations:
+            current_iteration += 1
+            self.logger.info(f"进入第 {current_iteration} 轮处理循环")
+            
+            # 1. Plan (规划阶段)
+            self.logger.info("开始规划阶段")
+            available_tools = list(self.executor.tools.keys())
+            # TODO: 未来可以让 Planner 接收之前的反思结果来优化计划
+            tasks = self.planner.plan(user_request, available_tools)
 
-        # 2. Act (执行阶段)
-        # TODO 修改执行阶段
-        self.logger.info("开始执行阶段")
-        try:
-            task_results = self.executor.execute_plan(tasks)
-            self.logger.info("执行阶段完成")
-        except Exception as e:
-            self.logger.error(f"执行阶段失败: {str(e)}")
-            return {
-                "status": "error",
-                "error_message": str(e),
-                "session_id": session_id,
-                "timestamp": time.time()
+            self.logger.info(
+                f"生成 {len(tasks)} 个任务: {[task.name for task in tasks]}")
+
+            # 2. Act (执行阶段)
+            self.logger.info("开始执行阶段")
+            try:
+                task_results = self.executor.execute_plan(tasks)
+                self.logger.info("执行阶段完成")
+            except Exception as e:
+                self.logger.error(f"执行阶段失败: {str(e)}")
+                # 如果执行过程抛出严重异常，终止循环
+                return {
+                    "status": "error",
+                    "error_message": str(e),
+                    "session_id": session_id,
+                    "timestamp": time.time()
+                }
+
+            # 3. Reflect (反思阶段)
+            self.logger.info("开始反思阶段")
+
+            # 反思每个任务
+            task_reflections = []
+            for i, task in enumerate(tasks):
+                reflection = self.reflector.reflect_on_task_execution(
+                    task, task_results[i])
+                task_reflections.append(reflection)
+
+            # 反思整个计划
+            plan_reflection = self.reflector.reflect_on_plan_execution(
+                tasks, task_results)
+
+            # 根据反思结果更新策略
+            self.reflector.update_planning_strategy(plan_reflection, user_request)
+            
+            # 记录本轮执行情况
+            current_round_result = {
+                "iteration": current_iteration,
+                "tasks": tasks,
+                "task_results": task_results,
+                "plan_reflection": plan_reflection
             }
+            execution_history.append(current_round_result)
+            
+            # 4. Decide (决策阶段)
+            # 决定下一步行动
+            decision = self.reflector.decide_next_step(plan_reflection, max_iterations, current_iteration)
+            self.logger.info(f"决策结果: {decision}")
+            
+            if decision['action'] == 'FINISH':
+                self.logger.info(f"任务完成，原因: {decision['reason']}")
+                break
+            elif decision['action'] == 'RETRY':
+                self.logger.info(f"准备重试，原因: {decision['reason']}")
+                # 简单延时后重试
+                time.sleep(1)
+                continue
+            else:
+                self.logger.info("未知决策，默认结束")
+                break
 
-        # 3. Reflect (反思阶段)
-        self.logger.info("开始反思阶段")
+        # 整理最终结果（使用最后一轮的结果）
+        last_round = execution_history[-1]
+        last_tasks = last_round['tasks']
+        last_results = last_round['task_results']
+        last_reflection = last_round['plan_reflection']
 
-        # 反思每个任务
-        task_reflections = []
-        for i, task in enumerate(tasks):
-            reflection = self.reflector.reflect_on_task_execution(
-                task, task_results[i])
-            task_reflections.append(reflection)
-
-        # 反思整个计划
-        plan_reflection = self.reflector.reflect_on_plan_execution(
-            tasks, task_results)
-
-        # 根据反思结果更新策略
-        self.reflector.update_planning_strategy(plan_reflection, user_request)
-
-        # 4. 整理最终结果
         final_result = {
             "status": "success",
             "session_id": session_id,
             "user_request": user_request,
-            "task_count": len(tasks),
-            "successful_tasks": len([r for r in task_results if r.get('status') == 'success']),
+            "iterations": current_iteration,
+            "task_count": len(last_tasks),
+            "successful_tasks": len([r for r in last_results if r.get('status') == 'success']),
             "tasks": [
                 {
                     "id": task.id,
@@ -153,14 +197,14 @@ class PrivateAgent:
                     "execution_time": result.get('execution_time'),
                     "status": result.get('status')
                 }
-                for task, result in zip(tasks, task_results)
+                for task, result in zip(last_tasks, last_results)
             ],
             "plan_reflection": {
-                "success_rate": plan_reflection.get('success_rate'),
-                "total_execution_time": plan_reflection.get('total_execution_time'),
-                "overall_evaluation": plan_reflection.get('overall_evaluation'),
-                "improvements": plan_reflection.get('system_improvements'),
-                "learning_points": plan_reflection.get('learning_points')
+                "success_rate": last_reflection.get('success_rate'),
+                "total_execution_time": last_reflection.get('total_execution_time'),
+                "overall_evaluation": last_reflection.get('overall_evaluation'),
+                "improvements": last_reflection.get('system_improvements'),
+                "learning_points": last_reflection.get('learning_points')
             },
             "timestamp": time.time()
         }
@@ -168,10 +212,14 @@ class PrivateAgent:
         # 保存会话上下文
         session_context = {
             "user_request": user_request,
-            "tasks": [task.__dict__ for task in tasks],
-            "results": task_results,
-            "reflections": task_reflections,
-            "plan_reflection": plan_reflection,
+            "execution_history": [
+                {
+                    "iteration": h["iteration"],
+                    "tasks": [t.__dict__ for t in h["tasks"]],
+                    "results": h["task_results"],
+                    "plan_reflection": h["plan_reflection"]
+                } for h in execution_history
+            ],
             "final_result": final_result
         }
 

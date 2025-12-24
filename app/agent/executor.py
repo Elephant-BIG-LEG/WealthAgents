@@ -2,6 +2,8 @@
 财富Agent - 智能投研分析平台
 私人Agent模块 - 执行器组件
 负责执行规划器生成的任务
+TODO 使用LLM模型评估当前信息是否足够回答用户问题，识别知识缺口并生成后续查询
+
 """
 from typing import Dict, Any, List, Optional
 from .planner import Task

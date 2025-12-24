@@ -88,8 +88,7 @@ class Reflector:
         self.logger.info(f"开始反思计划执行，共 {len(tasks)} 个任务")
 
         total_tasks = len(tasks)
-        successful_tasks = sum(
-            1 for r in results if r.get('status') == 'success')
+        successful_tasks = sum(1 for r in results if r.get('status') == 'success')
         failed_tasks = total_tasks - successful_tasks
 
         total_execution_time = sum(r.get('execution_time', 0) for r in results)
@@ -159,6 +158,36 @@ class Reflector:
         self.logger.info(
             f"计划执行反思完成，成功率: {reflection_result['success_rate']:.2%}")
         return reflection_result
+
+    def decide_next_step(self, plan_reflection: Dict[str, Any], max_retries: int = 3, current_retry: int = 0) -> Dict[str, Any]:
+        """
+        决定下一步行动
+        
+        Args:
+            plan_reflection: 计划反思结果
+            max_retries: 最大重试次数
+            current_retry: 当前重试次数
+            
+        Returns:
+            下一步行动建议
+        """
+        if current_retry >= max_retries:
+            return {"action": "FINISH", "reason": "已达到最大重试次数"}
+            
+        success_rate = plan_reflection.get('success_rate', 0)
+        
+        if success_rate == 1.0:
+            return {"action": "FINISH", "reason": "所有任务执行成功"}
+            
+        if success_rate >= 0.8:
+            return {"action": "FINISH", "reason": "大部分任务成功，可以接受"}
+            
+        # 如果成功率低，建议重试或重新规划
+        return {
+            "action": "RETRY", 
+            "reason": "部分任务失败，建议重试",
+            "failed_tasks": plan_reflection.get('failed_tasks', 0)
+        }
 
     def update_planning_strategy(self, plan_reflection: Dict[str, Any], user_request: str = ""):
         """
