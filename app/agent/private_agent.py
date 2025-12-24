@@ -234,21 +234,62 @@ class PrivateAgent:
                 if task["result"]:
                     task_result = task["result"]
                     if isinstance(task_result, dict):
-                        if "summary" in task_result:
-                            ai_response_parts.append(task_result["summary"])
+                        # 尝试获取自然语言描述字段
+                        content = task_result.get("summary") or \
+                                  task_result.get("analysis") or \
+                                  task_result.get("conclusion") or \
+                                  task_result.get("market_summary") or \
+                                  task_result.get("investment_advice")
+                        
+                        if content:
+                            if isinstance(content, dict):
+                                # 处理字典格式的内容
+                                title = content.get("title", "")
+                                summary_text = content.get("summary", "") or content.get("content", "")
+                                if title or summary_text:
+                                    formatted_content = ""
+                                    if title:
+                                        formatted_content += f"**{title}**<br>"
+                                    formatted_content += str(summary_text)
+                                    ai_response_parts.append(formatted_content)
+                            else:
+                                ai_response_parts.append(str(content))
                         elif "parsed_data" in task_result:
-                            ai_response_parts.append(
-                                str(task_result["parsed_data"]))
-                        elif "data" in task_result and isinstance(task_result["data"], str):
-                            ai_response_parts.append(task_result["data"])
-                        elif "analysis" in task_result:
-                            ai_response_parts.append(task_result["analysis"])
+                            parsed = task_result["parsed_data"]
+                            if isinstance(parsed, list):
+                                items = []
+                                for item in parsed:
+                                    if isinstance(item, dict):
+                                        item_str = item.get('content') or item.get('summary') or str(item)
+                                        items.append(item_str)
+                                    else:
+                                        items.append(str(item))
+                                ai_response_parts.append("<br>".join(items))
+                            else:
+                                ai_response_parts.append(str(parsed))
+                        elif "data" in task_result:
+                            data_val = task_result["data"]
+                            if isinstance(data_val, str):
+                                ai_response_parts.append(data_val)
+                            elif isinstance(data_val, list):
+                                if not data_val:
+                                    source = task_result.get("source", "数据源")
+                                    query = task_result.get("query", "未知查询")
+                                    ai_response_parts.append(f"从 {source} 未找到关于 '{query}' 的相关数据。")
+                                else:
+                                    ai_response_parts.append(f"找到 {len(data_val)} 条相关数据。")
+                            else:
+                                ai_response_parts.append(str(data_val))
                         else:
+                            # 最后的兜底，尝试格式化字典
+                            # 如果字典中包含 title 和 summary 且都为空，忽略
+                            if "title" in task_result and "summary" in task_result and not task_result["title"] and not task_result["summary"]:
+                                continue
                             ai_response_parts.append(str(task_result))
                     else:
                         ai_response_parts.append(str(task_result))
 
-            ai_response = "；".join(
+            ai_response = "<br><br>".join(
                 ai_response_parts) if ai_response_parts else "分析完成，未获得具体结果。"
         else:
             ai_response = f"处理请求时出现错误: {result.get('error_message', '未知错误')}"

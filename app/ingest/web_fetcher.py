@@ -97,7 +97,8 @@ def fetch_financeWeb_data(source: Source) -> List[str]:
 
         # 初始化变量
         all_content = []
-        current_url = source.source_id  # 修复：使用source.source_id而不是source.url
+        # 优先使用source.url，如果为空则使用source.source_id (兼容旧代码逻辑)
+        current_url = source.url if source.url else source.source_id
         current_page = 1
         max_pages = 3  # 限制最大页数，避免无限循环
 
