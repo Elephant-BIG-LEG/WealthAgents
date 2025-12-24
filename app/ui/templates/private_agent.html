@@ -208,15 +208,93 @@
         // 显示AI正在思考
         const thinkingMessage = addMessageToChat('ai', '<div class="typing-indicator"><span></span><span></span><span></span></div>', true);
 
-        // 模拟AI回复（实际应用中这里会调用后端API）
-        setTimeout(() => {
-            // 移除思考指示器
-            thinkingMessage.remove();
+        // 调用后端API与Agent交互
+        fetch('/api/agent/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                message: message,
+                session_id: window.currentSessionId || null  // 使用全局会话ID
+            })
+        })
+            .then(response => response.json())
+            .then(data => {
+                // 移除思考指示器
+                const thinkingElement = document.getElementById('thinking-message');
+                if (thinkingElement) {
+                    thinkingElement.remove();
+                }
 
-            // 生成AI回复
-            const aiResponse = generateAIResponse(message);
-            addMessageToChat('ai', aiResponse);
-        }, 1500);
+                if (data.success) {
+                    // 保存会话ID
+                    if (data.session_id) {
+                        window.currentSessionId = data.session_id;
+                    }
+
+                    // 提取并格式化AI响应
+                    let responseText = data.response;
+
+                    // 如果响应是对象，尝试提取有用的信息
+                    if (typeof responseText === 'object') {
+                        if (responseText.summary) {
+                            responseText = formatResponse(responseText.summary);
+                        } else if (responseText.parsed_data) {
+                            responseText = formatResponse(responseText.parsed_data);
+                        } else {
+                            responseText = JSON.stringify(responseText, null, 2);
+                        }
+                    } else if (Array.isArray(responseText)) {
+                        // 如果是数组，将其转换为文本
+                        responseText = responseText.join('<br>');
+                    }
+
+                    // 添加AI响应到聊天记录
+                    addMessageToChat('ai', responseText);
+                } else {
+                    // 显示错误信息
+                    addMessageToChat('ai', `抱歉，处理您的请求时出现错误: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                // 移除思考指示器
+                const thinkingElement = document.getElementById('thinking-message');
+                if (thinkingElement) {
+                    thinkingElement.remove();
+                }
+
+                console.error('Error:', error);
+                addMessageToChat('ai', '抱歉，连接服务器时出现错误，请稍后重试。');
+            });
+    }
+
+    // 格式化响应数据的辅助函数
+    function formatResponse(data) {
+        if (typeof data === 'string') {
+            return data;
+        } else if (typeof data === 'object') {
+            // 尝试提取有意义的字段
+            if (data.summary) {
+                return data.summary;
+            } else if (data.market_trend) {
+                let formatted = '';
+                if (data.topic) formatted += `<strong>主题:</strong> ${data.topic}<br>`;
+                if (data.market_trend) formatted += `<strong>市场趋势:</strong> ${data.market_trend}<br>`;
+                if (data.investment_advice) formatted += `<strong>投资建议:</strong> ${data.investment_advice}<br>`;
+                if (data.hotspot_summary) formatted += `<strong>热点总结:</strong> ${data.hotspot_summary}<br>`;
+                return formatted || '未获取到具体分析结果';
+            } else if (data.title && data.title !== '') {
+                return `<strong>${data.title}</strong><br>${data.summary || ''}`;
+            } else {
+                // 返回对象的所有键值对
+                return Object.entries(data)
+                    .map(([key, value]) => `<strong>${key}:</strong> ${typeof value === 'object' ? JSON.stringify(value) : value}`)
+                    .join('<br>');
+            }
+        } else {
+            return String(data);
+        }
     }
 
     function addMessageToChat(sender, content, isTemporary = false) {
@@ -257,41 +335,6 @@
         chatMessages.scrollTop = chatMessages.scrollHeight;
 
         return messageDiv;
-    }
-
-    function generateAIResponse(userMessage) {
-        // 这里应该是调用实际的AI API，现在我们用模拟回复
-        const responses = [
-            "根据最新的市场数据，我分析了您提到的问题。当前市场趋势显示...",
-            "关于您询问的内容，我已经进行了深入分析。从技术面来看...",
-            "感谢您的提问。基于我的知识库，我可以为您提供以下见解...",
-            "这是一个很好的问题。让我为您详细分析一下相关情况...",
-            "根据我的分析，您关注的领域目前呈现出以下特点..."
-        ];
-
-        // 根据用户消息内容给出更相关的回复
-        if (userMessage.includes('市场') || userMessage.includes('热点')) {
-            return "根据最新的市场数据，当前市场热点主要集中在以下几个方面：<br><br>" +
-                "1. <strong>科技创新板块</strong>：人工智能和半导体行业表现突出<br>" +
-                "2. <strong>新能源领域</strong>：光伏和储能概念持续受到关注<br>" +
-                "3. <strong>消费复苏</strong>：餐饮和旅游板块出现回暖迹象<br><br>" +
-                "建议关注这些领域的龙头股，同时注意控制仓位风险。";
-        } else if (userMessage.includes('苹果') || userMessage.includes('财报')) {
-            return "关于苹果公司的最新财报分析：<br><br>" +
-                "• <strong>营收表现</strong>：本季度营收同比增长8.1%，超出市场预期<br>" +
-                "• <strong>利润率</strong>：净利润率保持在25.2%的高位<br>" +
-                "• <strong>产品线</strong>：iPhone销售额增长6.3%，服务收入增长12.7%<br><br>" +
-                "总体来看，苹果公司基本面稳健，建议长期持有。";
-        } else if (userMessage.includes('科技股') || userMessage.includes('推荐')) {
-            return "基于当前市场环境，我推荐关注以下几只科技股：<br><br>" +
-                "1. <strong>人工智能领域</strong>：关注具备核心技术壁垒的AI芯片公司<br>" +
-                "2. <strong>云计算服务</strong>：行业龙头具有稳定增长潜力<br>" +
-                "3. <strong>半导体设计</strong>：国产替代趋势明显的细分龙头<br><br>" +
-                "投资建议：采用分批建仓策略，关注技术面突破信号。";
-        } else {
-            const randomIndex = Math.floor(Math.random() * responses.length);
-            return responses[randomIndex] + "<br><br>如果您需要更详细的分析，请告诉我具体关注的方面。";
-        }
     }
 
     function formatTime(date) {
@@ -341,10 +384,35 @@
                 sendMessage();
             });
         });
+
+        // 清空会话ID
+        window.currentSessionId = null;
     }
 
     function exportChat() {
         showMessage('对话导出功能将在后续版本中实现', 'info');
+    }
+
+    function showMessage(message, type = 'info') {
+        // 创建临时消息元素
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+        alertDiv.style.zIndex = '9999';
+        alertDiv.style.top = '20px';
+        alertDiv.style.right = '20px';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+
+        document.body.appendChild(alertDiv);
+
+        // 3秒后自动移除
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.parentNode.removeChild(alertDiv);
+            }
+        }, 3000);
     }
 </script>
 <style>

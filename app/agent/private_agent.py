@@ -2,6 +2,7 @@
 财富Agent - 智能投研分析平台
 私人Agent模块 - 私人Agent主类
 整合Plan → Act → Reflect决策闭环
+TODO 修改私人Agent前端响应结果
 """
 from typing import Dict, Any, List, Optional
 from .planner import Planner, Task
@@ -13,6 +14,13 @@ import uuid
 import time
 import importlib
 
+"""
+私人Agent - 实现Plan → Act → Reflect决策闭环
+TODO
+集合各大功能组件
+修改执行逻辑
+
+"""
 
 class PrivateAgent:
     """私人Agent - 实现Plan → Act → Reflect决策闭环"""
@@ -97,6 +105,7 @@ class PrivateAgent:
             f"生成 {len(tasks)} 个任务: {[task.name for task in tasks]}")
 
         # 2. Act (执行阶段)
+        # TODO 修改执行阶段
         self.logger.info("开始执行阶段")
         try:
             task_results = self.executor.execute_plan(tasks)
@@ -213,6 +222,7 @@ class PrivateAgent:
             "last_update": time.time()
         }
 
+        # 更新 memory
         self.memory_manager.save_conversation_context(session_id, session_data)
 
         # 准备返回给前端的响应

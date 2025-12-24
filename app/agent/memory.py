@@ -10,8 +10,7 @@ from datetime import datetime, timedelta
 import redis
 import pickle
 import os
-# 修复导入路径 - 不使用相对导入到config
-# from ..config.config import Config
+
 
 
 class MemoryManager:

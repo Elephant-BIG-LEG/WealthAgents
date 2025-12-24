@@ -1,8 +1,15 @@
+"""
+财富Agent - 智能投研分析平台
+UI模块 - Web应用主入口
+集成Plan → Act → Reflect决策闭环的私人Agent
+"""
+
 from app.config.config import DB_CONFIG
 from app.ingest.source import Source
 from app.ingest.web_fetcher import Collection_action_llm
 from app.agentWorker.data_summarizer import LangChainHelperWithSummary
 from app.agentWorker.data_parse_and_process import LangChainHelperWithIntegration
+from app.agent.private_agent import PrivateAgent  # 导入新的Agent框架
 import json
 import logging
 import os
@@ -28,6 +35,9 @@ print(f"Template directory: {template_dir}")  # 调试信息
 
 app = Flask(__name__, template_folder=template_dir)
 
+# 创建全局Agent实例
+agent = PrivateAgent()
+
 # 数据库连接信息（从配置文件读取）
 DB_CONFIG = DB_CONFIG
 
@@ -52,6 +62,7 @@ def get_db_connection():
         logging.error(f"数据库连接失败: {str(e)}")
         return None
 
+
 # 处理跨域预检请求
 
 
@@ -63,6 +74,7 @@ def after_request(response):
     response.headers.add('Access-Control-Allow-Methods',
                          'GET,PUT,POST,DELETE,OPTIONS')
     return response
+
 
 # 处理OPTIONS预检请求
 
@@ -94,12 +106,14 @@ summarizer_helper = LangChainHelperWithSummary()
 def index():
     return render_template('dashboard.html')
 
+
 # 数据采集页面
 
 
 @app.route('/data-collection')
 def data_collection():
     return render_template('data_collection.html')
+
 
 # 近期热点页面
 
@@ -108,12 +122,14 @@ def data_collection():
 def recent_hotspots():
     return render_template('recent_hotspots.html')
 
+
 # 股票分析页面
 
 
 @app.route('/stock-analysis')
 def stock_analysis():
     return render_template('stock_analysis.html')
+
 
 # 财务分析页面
 
@@ -122,12 +138,14 @@ def stock_analysis():
 def financial_analysis():
     return render_template('financial_analysis.html')
 
+
 # 私人Agent页面
 
 
 @app.route('/private-agent')
 def private_agent():
     return render_template('private_agent.html')
+
 
 # 往期数据页面
 
@@ -136,12 +154,57 @@ def private_agent():
 def historical_data():
     return render_template('historical_data.html')
 
+
 # 设置页面
 
 
 @app.route('/settings')
 def settings():
     return render_template('settings.html')
+
+
+# 新增：私人Agent API端点 - 处理与Agent的交互
+@app.route('/api/agent/chat', methods=['POST'])
+def agent_chat():
+    """
+    与私人Agent的聊天API端点
+    接收用户消息并返回Agent的响应
+    """
+    try:
+        data = request.get_json()
+        user_message = data.get('message', '')
+        session_id = data.get('session_id')  # 可选的会话ID
+
+        if not user_message:
+            return jsonify({
+                'success': False,
+                'message': '消息内容不能为空'
+            })
+
+        # 调用Agent进行处理
+        # TODO
+        response = agent.chat(user_message, session_id)
+
+        if response['status'] == 'success':
+            return jsonify({
+                'success': True,
+                'response': response['response'],
+                'session_id': response['session_id'],
+                'detailed_result': response.get('detailed_result', {})
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': response.get('error_message', '处理请求时发生错误')
+            })
+
+    except Exception as e:
+        logger.error(f"处理Agent聊天请求时发生错误: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'服务器内部错误: {str(e)}'
+        })
+
 
 # API路由 - 仪表盘统计数据
 
