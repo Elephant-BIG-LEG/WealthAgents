@@ -155,33 +155,63 @@ class LangGraphAgent:
     
     def _plan_node(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
-        规划节点
-        根据用户请求生成执行计划
+        规划节点：负责生成执行计划
         """
-        logger.info("进入规划节点")
         user_query = state.get("query", "")
-        
-        # 获取历史上下文（如果启用了memory）
-        context = []
-        if self.memory:
-            context = self.memory.get_context(user_query)
-        
-        # 生成计划
-        plan = self.planner.create_plan(user_query, context)
-        
-        # 应用自定义处理函数（如果有）
-        if "plan_preprocess" in self.config["custom_handlers"]:
-            plan = self.config["custom_handlers"]["plan_preprocess"](plan)
-        
-        logger.info(f"生成计划: {plan}")
-        
-        # 更新状态
-        return {
-            **state,
-            "plan": plan,
-            "current_step": 0,
-            "history": state.get("history", []) + ["计划生成完成"]
-        }
+        logger.info(f"Planning for query: {user_query}")
+
+        try:
+            # 1. 获取上下文信息
+            context = []
+            if self.memory:
+                try:
+                    context = self.memory.get_context(user_query)
+                except Exception as e:
+                    logger.error(f"Error getting context from memory: {e}")
+                    # 使用空上下文继续执行
+                    context = []
+
+            # 2. 生成执行计划
+            if self.planner:
+                try:
+                    plan = self.planner.create_plan(user_query, context)
+                except Exception as e:
+                    logger.error(f"Error creating plan: {e}")
+                    # 如果规划失败，创建一个默认的通用查询任务
+                    plan = [{
+                        "id": "default_task_1",
+                        "name": "通用查询",
+                        "description": "处理通用查询请求",
+                        "tool_name": "general_query",
+                        "parameters": {"query": user_query},
+                        "dependencies": []
+                    }]
+            else:
+                # 如果没有规划器，创建一个默认的通用查询任务
+                plan = [{
+                    "id": "default_task_1",
+                    "name": "通用查询",
+                    "description": "处理通用查询请求",
+                    "tool_name": "general_query",
+                    "parameters": {"query": user_query},
+                    "dependencies": []
+                }]
+
+            logger.info(f"Generated plan with {len(plan)} tasks")
+
+            # 3. 更新状态
+            state["plan"] = plan
+            state["current_task_index"] = 0
+            state["task_results"] = []
+            state["reflection"] = ""
+            state["error"] = None
+
+        except Exception as e:
+            logger.error(f"Unexpected error in _plan_node: {e}")
+            state["error"] = str(e)
+            state["plan"] = []
+
+        return state
     
     def _execute_node(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -364,6 +394,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
