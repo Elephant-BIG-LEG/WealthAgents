@@ -233,22 +233,8 @@
                         window.currentSessionId = data.session_id;
                     }
 
-                    // 提取并格式化AI响应
-                    let responseText = data.response;
-
-                    // 如果响应是对象，尝试提取有用的信息
-                    if (typeof responseText === 'object') {
-                        if (responseText.summary) {
-                            responseText = formatResponse(responseText.summary);
-                        } else if (responseText.parsed_data) {
-                            responseText = formatResponse(responseText.parsed_data);
-                        } else {
-                            responseText = JSON.stringify(responseText, null, 2);
-                        }
-                    } else if (Array.isArray(responseText)) {
-                        // 如果是数组，将其转换为文本
-                        responseText = responseText.join('<br>');
-                    }
+                    // 提取并格式化AI响应 - 优先使用格式化的response，如果不存在则使用详细结果
+                    let responseText = data.response || extractAndFormatResponse(data.detailed_result);
 
                     // 添加AI响应到聊天记录
                     addMessageToChat('ai', responseText);
@@ -269,32 +255,152 @@
             });
     }
 
-    // 格式化响应数据的辅助函数
-    function formatResponse(data) {
-        if (typeof data === 'string') {
-            return data;
-        } else if (typeof data === 'object') {
-            // 尝试提取有意义的字段
-            if (data.summary) {
-                return data.summary;
-            } else if (data.market_trend) {
-                let formatted = '';
-                if (data.topic) formatted += `<strong>主题:</strong> ${data.topic}<br>`;
-                if (data.market_trend) formatted += `<strong>市场趋势:</strong> ${data.market_trend}<br>`;
-                if (data.investment_advice) formatted += `<strong>投资建议:</strong> ${data.investment_advice}<br>`;
-                if (data.hotspot_summary) formatted += `<strong>热点总结:</strong> ${data.hotspot_summary}<br>`;
-                return formatted || '未获取到具体分析结果';
-            } else if (data.title && data.title !== '') {
-                return `<strong>${data.title}</strong><br>${data.summary || ''}`;
-            } else {
-                // 返回对象的所有键值对
-                return Object.entries(data)
-                    .map(([key, value]) => `<strong>${key}:</strong> ${typeof value === 'object' ? JSON.stringify(value) : value}`)
-                    .join('<br>');
-            }
-        } else {
-            return String(data);
+    // 从详细结果中提取并格式化响应的辅助函数
+    function extractAndFormatResponse(detailedResult) {
+        if (!detailedResult) {
+            return '未获取到分析结果';
         }
+
+        // 检查是否是包含任务数组的对象
+        if (detailedResult.tasks && Array.isArray(detailedResult.tasks)) {
+            const taskResults = [];
+
+            for (const task of detailedResult.tasks) {
+                if (task.result && task.result.parsed_data) {
+                    const parsedData = task.result.parsed_data;
+
+                    // 根据数据类型提取信息
+                    if (typeof parsedData === 'string') {
+                        taskResults.push(`<strong>${task.name}:</strong><br>${parsedData}`);
+                    } else if (typeof parsedData === 'object') {
+                        let taskContent = '';
+
+                        // 优先提取summary或content
+                        if (parsedData.summary) {
+                            taskContent = parsedData.summary;
+                        } else if (parsedData.content) {
+                            taskContent = parsedData.content;
+                        } else if (parsedData.title && parsedData.title !== '') {
+                            taskContent = `<strong>${parsedData.title}</strong><br>${parsedData.summary || parsedData.content || ''}`;
+                        } else {
+                            // 如果没有标准字段，尝试其他常见字段
+                            const fields = ['market_trend', 'investment_advice', 'hotspot_summary', 'analysis', 'title'];
+                            for (const field of fields) {
+                                if (parsedData[field]) {
+                                    if (typeof parsedData[field] === 'string') {
+                                        taskContent += `<strong>${field}:</strong> ${parsedData[field]}<br>`;
+                                    } else if (typeof parsedData[field] === 'object') {
+                                        // 如果字段是对象，尝试提取其中的文本
+                                        if (parsedData[field].summary) {
+                                            taskContent += `<strong>${field}:</strong> ${parsedData[field].summary}<br>`;
+                                        } else {
+                                            taskContent += `<strong>${field}:</strong> ${JSON.stringify(parsedData[field])}<br>`;
+                                        }
+                                    } else {
+                                        taskContent += `<strong>${field}:</strong> ${parsedData[field]}<br>`;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (taskContent) {
+                            taskResults.push(`<strong>${task.name}:</strong><br>${taskContent}`);
+                        }
+                    }
+                } else if (task.result && task.result.summary) {
+                    // 如果结果直接有summary字段
+                    const summary = task.result.summary;
+                    if (typeof summary === 'string') {
+                        taskResults.push(`<strong>${task.name}:</strong><br>${summary}`);
+                    } else if (typeof summary === 'object') {
+                        let summaryText = '';
+                        if (summary.summary) {
+                            summaryText = summary.summary;
+                        } else if (summary.title && summary.title !== '') {
+                            summaryText = `<strong>${summary.title}</strong><br>${summary.summary || ''}`;
+                        } else {
+                            summaryText = JSON.stringify(summary);
+                        }
+                        if (summaryText) {
+                            taskResults.push(`<strong>${task.name}:</strong><br>${summaryText}`);
+                        }
+                    }
+                } else if (task.result) {
+                    // 如果task.result是直接的字符串或对象
+                    if (typeof task.result === 'string') {
+                        taskResults.push(`<strong>${task.name}:</strong><br>${task.result}`);
+                    } else if (typeof task.result === 'object' && task.result.status === 'success') {
+                        // 检查是否有其他有用字段
+                        let content = '';
+                        if (task.result.data) {
+                            if (typeof task.result.data === 'string') {
+                                content = task.result.data;
+                            } else {
+                                content = JSON.stringify(task.result.data);
+                            }
+                        } else if (task.result.original_text_length || task.result.timestamp) {
+                            // 跳过只包含元数据的任务结果
+                            continue;
+                        }
+
+                        if (content) {
+                            taskResults.push(`<strong>${task.name}:</strong><br>${content}`);
+                        }
+                    }
+                }
+            }
+
+            // 合并所有任务结果
+            return taskResults.length > 0 ? taskResults.join('<br><br>') : '未获取到具体分析结果';
+        }
+
+        // 检查是否是单个任务对象（直接的任务结果）
+        if (detailedResult.task_id && detailedResult.result) {
+            // 这是一个单个任务对象
+            if (detailedResult.result.parsed_data) {
+                const parsedData = detailedResult.result.parsed_data;
+                if (typeof parsedData === 'string') {
+                    return parsedData;
+                } else if (typeof parsedData === 'object') {
+                    let content = '';
+                    if (parsedData.summary) {
+                        content = parsedData.summary;
+                    } else if (parsedData.content) {
+                        content = parsedData.content;
+                    } else if (parsedData.title) {
+                        content = `<strong>${parsedData.title}</strong><br>${parsedData.summary || parsedData.content || ''}`;
+                    } else {
+                        content = JSON.stringify(parsedData);
+                    }
+                    return content;
+                }
+            } else if (detailedResult.result.summary) {
+                return detailedResult.result.summary;
+            }
+            return JSON.stringify(detailedResult.result);
+        }
+
+        // 如果是简单响应
+        if (typeof detailedResult === 'string') {
+            return detailedResult;
+        }
+
+        if (typeof detailedResult === 'object') {
+            // 尝试直接从对象中提取有用信息
+            if (detailedResult.response) {
+                return extractAndFormatResponse(detailedResult.response);
+            } else if (detailedResult.summary) {
+                return detailedResult.summary;
+            } else if (detailedResult.parsed_data) {
+                return extractAndFormatResponse(detailedResult.parsed_data);
+            } else if (Array.isArray(detailedResult)) {
+                // 如果是数组，递归处理每个元素
+                const results = detailedResult.map(item => extractAndFormatResponse(item));
+                return results.join('<br><br>');
+            }
+        }
+
+        return '未获取到具体分析结果';
     }
 
     function addMessageToChat(sender, content, isTemporary = false) {

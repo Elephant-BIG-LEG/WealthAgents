@@ -83,6 +83,22 @@ def data_parsing_tool(text: str = "", **kwargs) -> Dict[str, Any]:
     text_to_parse = text if text else kwargs.get(
         'text', kwargs.get('content', ''))
 
+    # 尝试从search_results参数获取知识库检索结果
+    if not text_to_parse and 'search_results' in kwargs:
+        search_results = kwargs.get('search_results', [])
+        if search_results:
+            # 提取检索结果中的文本内容
+            text_items = []
+            for result in search_results:
+                if isinstance(result, tuple) and len(result) > 0:
+                    # 知识库结果通常是(text, similarity, meta)格式
+                    text_items.append(str(result[0]))
+                elif isinstance(result, dict) and 'text' in result:
+                    text_items.append(result['text'])
+                else:
+                    text_items.append(str(result))
+            text_to_parse = '\n'.join(text_items)
+
     # 如果text为空，尝试从dependency_results中获取
     if not text_to_parse:
         dependency_results = kwargs.get('dependency_results', {})
@@ -141,3 +157,4 @@ def data_parsing_tool(text: str = "", **kwargs) -> Dict[str, Any]:
 
     tool = DataParsingTool()
     return tool.parse_financial_text(text_to_parse, **kwargs)
+

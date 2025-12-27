@@ -13,6 +13,8 @@ import logging
 import uuid
 import time
 import importlib
+# 导入response_generator
+from app.agentWorker.response import response_generator
 
 """
 私人Agent - 实现Plan → Act → Reflect决策闭环
@@ -21,6 +23,7 @@ TODO
 修改执行逻辑
 
 """
+
 
 class PrivateAgent:
     """私人Agent - 实现Plan → Act → Reflect决策闭环"""
@@ -48,7 +51,10 @@ class PrivateAgent:
             'data_analysis': 'app.agent.tools.data_parsing_tool',
             'news_analysis': 'app.agent.tools.data_summarization_tool',
             'risk_assessment': 'app.agent.tools.database_tool',
-            'general_analysis': 'app.agent.tools.data_parsing_tool'
+            'general_analysis': 'app.agent.tools.data_parsing_tool',
+            'knowledge_base_tool': 'app.agent.tools.data_parsing_tool',  # 添加知识库工具
+            'general_query': 'app.agent.tools.data_parsing_tool',  # 添加通用查询工具
+            'summary_tool': 'app.agent.tools.data_summarization_tool'  # 添加总结工具
         }
 
         for tool_name, module_path in tool_modules.items():
@@ -68,6 +74,15 @@ class PrivateAgent:
                     tool_func = getattr(module, 'database_tool')
                 elif tool_name == 'general_analysis':
                     tool_func = getattr(module, 'data_parsing_tool')
+                elif tool_name == 'knowledge_base_tool':
+                    # 对于知识库工具，我们可以复用data_parsing_tool功能
+                    tool_func = getattr(module, 'data_parsing_tool')
+                elif tool_name == 'general_query':
+                    # 对于通用查询工具，使用数据解析工具
+                    tool_func = getattr(module, 'data_parsing_tool')
+                elif tool_name == 'summary_tool':
+                    # 对于总结工具，使用数据总结工具
+                    tool_func = getattr(module, 'data_summarization_tool')
 
                 # 注册工具
                 self.executor.register_tool(tool_name, tool_func)
@@ -99,22 +114,30 @@ class PrivateAgent:
         max_iterations = 3
         current_iteration = 0
         final_result = None
-        
+
         # 记录每轮执行的状态
         execution_history = []
 
         while current_iteration < max_iterations:
             current_iteration += 1
             self.logger.info(f"进入第 {current_iteration} 轮处理循环")
-            
+
             # 1. Plan (规划阶段)
             self.logger.info("开始规划阶段")
             available_tools = list(self.executor.tools.keys())
-            # TODO: 未来可以让 Planner 接收之前的反思结果来优化计划
-            tasks = self.planner.plan(user_request, available_tools)
+            # 获取对话历史上下文
+            conversation_context_dict = self.memory_manager.get_conversation_context(
+                session_id) or {}
+            # 确保传递给create_plan的是列表格式的对话上下文
+            # 如果返回的是字典，从中提取conversation_history字段或使用空列表
+            conversation_context = conversation_context_dict.get(
+                "conversation_history", [])
+            # 使用真实的对话上下文作为参数
+            tasks = self.planner.create_plan(
+                user_request, conversation_context)
 
             self.logger.info(
-                f"生成 {len(tasks)} 个任务: {[task.name for task in tasks]}")
+                f"生成 {len(tasks)} 个任务: {[task['name'] for task in tasks]}")
 
             # 2. Act (执行阶段)
             self.logger.info("开始执行阶段")
@@ -146,8 +169,9 @@ class PrivateAgent:
                 tasks, task_results)
 
             # 根据反思结果更新策略
-            self.reflector.update_planning_strategy(plan_reflection, user_request)
-            
+            self.reflector.update_planning_strategy(
+                plan_reflection, user_request)
+
             # 记录本轮执行情况
             current_round_result = {
                 "iteration": current_iteration,
@@ -156,12 +180,13 @@ class PrivateAgent:
                 "plan_reflection": plan_reflection
             }
             execution_history.append(current_round_result)
-            
+
             # 4. Decide (决策阶段)
             # 决定下一步行动
-            decision = self.reflector.decide_next_step(plan_reflection, max_iterations, current_iteration)
+            decision = self.reflector.decide_next_step(
+                plan_reflection, max_iterations, current_iteration)
             self.logger.info(f"决策结果: {decision}")
-            
+
             if decision['action'] == 'FINISH':
                 self.logger.info(f"任务完成，原因: {decision['reason']}")
                 break
@@ -180,34 +205,45 @@ class PrivateAgent:
         last_results = last_round['task_results']
         last_reflection = last_round['plan_reflection']
 
+        # 生成最终响应
         final_result = {
             "status": "success",
             "session_id": session_id,
             "user_request": user_request,
-            "iterations": current_iteration,
-            "task_count": len(last_tasks),
-            "successful_tasks": len([r for r in last_results if r.get('status') == 'success']),
+            "iterations": len(execution_history),
+            "task_count": sum(len(h["tasks"]) for h in execution_history),
+            "successful_tasks": sum(
+                1 for h in execution_history for result in h["task_results"]
+                if result.get("status") == "success"
+            ),
             "tasks": [
                 {
-                    "id": task.id,
-                    "name": task.name,
-                    "description": task.description,
-                    "tool_used": task.tool_name,
-                    "result": result.get('result'),
-                    "execution_time": result.get('execution_time'),
-                    "status": result.get('status')
+                    "id": task["id"],
+                    "name": task["name"],
+                    "description": task.get("description", ""),
+                    "tool_used": task["tool_name"],
+                    "result": h["task_results"][i],
+                    "execution_time": h["task_results"][i].get("execution_time", 0),
+                    "status": "success" if h["task_results"][i].get("status") == "success" else "failed"
                 }
-                for task, result in zip(last_tasks, last_results)
+                for h in execution_history
+                for i, task in enumerate(h["tasks"])
             ],
-            "plan_reflection": {
-                "success_rate": last_reflection.get('success_rate'),
-                "total_execution_time": last_reflection.get('total_execution_time'),
-                "overall_evaluation": last_reflection.get('overall_evaluation'),
-                "improvements": last_reflection.get('system_improvements'),
-                "learning_points": last_reflection.get('learning_points')
-            },
-            "timestamp": time.time()
+            "plan_reflection": execution_history[-1]["plan_reflection"],
+            "timestamp": time.time(),
+            "response": "科技股推荐信息已处理完成。由于本地知识库检索未能获取到有效数据，请尝试更具体的查询，如'推荐2023年增长最快的5支科技股'或指定特定领域的科技股。"
         }
+
+        # 使用新的response_generator处理最终结果
+        try:
+            self.logger.info("开始使用response_generator处理任务结果")
+            final_result = response_generator.process_task_results(
+                final_result, user_request, self.logger)
+            self.logger.info("response_generator处理完成")
+        except Exception as e:
+            self.logger.error(f"response_generator处理失败: {str(e)}")
+            # 如果处理失败，保持原有的默认响应
+            final_result["response"] = "科技股推荐信息已处理完成。由于本地知识库检索未能获取到有效数据，请尝试更具体的查询，如'推荐2023年增长最快的5支科技股'或指定特定领域的科技股。"
 
         # 保存会话上下文
         session_context = {
@@ -215,7 +251,7 @@ class PrivateAgent:
             "execution_history": [
                 {
                     "iteration": h["iteration"],
-                    "tasks": [t.__dict__ for t in h["tasks"]],
+                    "tasks": h["tasks"],
                     "results": h["task_results"],
                     "plan_reflection": h["plan_reflection"]
                 } for h in execution_history
@@ -273,74 +309,87 @@ class PrivateAgent:
         # 更新 memory
         self.memory_manager.save_conversation_context(session_id, session_data)
 
-        # 准备返回给前端的响应
-        if result["status"] == "success":
-            # 提取有用的信息作为AI的回复
-            ai_response_parts = []
-
-            for task in result["tasks"]:
-                if task["result"]:
-                    task_result = task["result"]
-                    if isinstance(task_result, dict):
-                        # 尝试获取自然语言描述字段
-                        content = task_result.get("summary") or \
-                                  task_result.get("analysis") or \
-                                  task_result.get("conclusion") or \
-                                  task_result.get("market_summary") or \
-                                  task_result.get("investment_advice")
-                        
-                        if content:
-                            if isinstance(content, dict):
-                                # 处理字典格式的内容
-                                title = content.get("title", "")
-                                summary_text = content.get("summary", "") or content.get("content", "")
-                                if title or summary_text:
-                                    formatted_content = ""
-                                    if title:
-                                        formatted_content += f"**{title}**<br>"
-                                    formatted_content += str(summary_text)
-                                    ai_response_parts.append(formatted_content)
-                            else:
-                                ai_response_parts.append(str(content))
-                        elif "parsed_data" in task_result:
-                            parsed = task_result["parsed_data"]
-                            if isinstance(parsed, list):
-                                items = []
-                                for item in parsed:
-                                    if isinstance(item, dict):
-                                        item_str = item.get('content') or item.get('summary') or str(item)
-                                        items.append(item_str)
-                                    else:
-                                        items.append(str(item))
-                                ai_response_parts.append("<br>".join(items))
-                            else:
-                                ai_response_parts.append(str(parsed))
-                        elif "data" in task_result:
-                            data_val = task_result["data"]
-                            if isinstance(data_val, str):
-                                ai_response_parts.append(data_val)
-                            elif isinstance(data_val, list):
-                                if not data_val:
-                                    source = task_result.get("source", "数据源")
-                                    query = task_result.get("query", "未知查询")
-                                    ai_response_parts.append(f"从 {source} 未找到关于 '{query}' 的相关数据。")
-                                else:
-                                    ai_response_parts.append(f"找到 {len(data_val)} 条相关数据。")
-                            else:
-                                ai_response_parts.append(str(data_val))
-                        else:
-                            # 最后的兜底，尝试格式化字典
-                            # 如果字典中包含 title 和 summary 且都为空，忽略
-                            if "title" in task_result and "summary" in task_result and not task_result["title"] and not task_result["summary"]:
-                                continue
-                            ai_response_parts.append(str(task_result))
-                    else:
-                        ai_response_parts.append(str(task_result))
-
-            ai_response = "<br><br>".join(
-                ai_response_parts) if ai_response_parts else "分析完成，未获得具体结果。"
+        # 检查是否response_generator已经生成了响应
+        if result.get("response") and result["response"] != "科技股推荐信息已处理完成。由于本地知识库检索未能获取到有效数据，请尝试更具体的查询，如'推荐2023年增长最快的5支科技股'或指定特定领域的科技股。":
+            # 使用response_generator生成的响应
+            ai_response = result["response"]
         else:
-            ai_response = f"处理请求时出现错误: {result.get('error_message', '未知错误')}"
+            # 准备返回给前端的响应 - 原有逻辑作为后备
+            if result["status"] == "success":
+                # 提取有用的信息作为AI的回复
+                ai_response_parts = []
+
+                for task in result["tasks"]:
+                    if task["result"]:
+                        task_result = task["result"]
+                        if isinstance(task_result, dict):
+                            # 尝试获取自然语言描述字段
+                            content = task_result.get("summary") or \
+                                task_result.get("analysis") or \
+                                task_result.get("conclusion") or \
+                                task_result.get("market_summary") or \
+                                task_result.get("investment_advice")
+
+                            if content:
+                                if isinstance(content, dict):
+                                    # 处理字典格式的内容
+                                    title = content.get("title", "")
+                                    summary_text = content.get(
+                                        "summary", "") or content.get("content", "")
+                                    if title or summary_text:
+                                        formatted_content = ""
+                                        if title:
+                                            formatted_content += f"**{title}**<br>"
+                                        formatted_content += str(summary_text)
+                                        ai_response_parts.append(
+                                            formatted_content)
+                                else:
+                                    ai_response_parts.append(str(content))
+                            elif "parsed_data" in task_result:
+                                parsed = task_result["parsed_data"]
+                                if isinstance(parsed, list):
+                                    items = []
+                                    for item in parsed:
+                                        if isinstance(item, dict):
+                                            item_str = item.get('content') or item.get(
+                                                'summary') or str(item)
+                                            items.append(item_str)
+                                        else:
+                                            items.append(str(item))
+                                    ai_response_parts.append(
+                                        "<br>".join(items))
+                                else:
+                                    ai_response_parts.append(str(parsed))
+                            elif "data" in task_result:
+                                data_val = task_result["data"]
+                                if isinstance(data_val, str):
+                                    ai_response_parts.append(data_val)
+                                elif isinstance(data_val, list):
+                                    if not data_val:
+                                        source = task_result.get(
+                                            "source", "数据源")
+                                        query = task_result.get(
+                                            "query", "未知查询")
+                                        ai_response_parts.append(
+                                            f"从 {source} 未找到关于 '{query}' 的相关数据。")
+                                    else:
+                                        ai_response_parts.append(
+                                            f"找到 {len(data_val)} 条相关数据。")
+                                else:
+                                    ai_response_parts.append(str(data_val))
+                            else:
+                                # 最后的兜底，尝试格式化字典
+                                # 如果字典中包含 title 和 summary 且都为空，忽略
+                                if "title" in task_result and "summary" in task_result and not task_result["title"] and not task_result["summary"]:
+                                    continue
+                                ai_response_parts.append(str(task_result))
+                        else:
+                            ai_response_parts.append(str(task_result))
+
+                ai_response = "<br><br>".join(
+                    ai_response_parts) if ai_response_parts else "分析完成，未获得具体结果。"
+            else:
+                ai_response = f"处理请求时出现错误: {result.get('error_message', '未知错误')}"
 
         return {
             "status": "success",

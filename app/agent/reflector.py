@@ -5,7 +5,6 @@
 """
 from typing import Dict, Any, List, Optional
 from .memory import MemoryManager
-from .planner import Task
 import time
 import logging
 from datetime import datetime
@@ -18,22 +17,22 @@ class Reflector:
         self.memory_manager = memory_manager
         self.logger = logging.getLogger(__name__)
 
-    def reflect_on_task_execution(self, task: Task, result: Dict[str, Any]) -> Dict[str, Any]:
+    def reflect_on_task_execution(self, task: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, Any]:
         """
         反思单个任务的执行结果
 
         Args:
-            task: 执行的任务
+            task: 执行的任务（字典格式）
             result: 任务执行结果
 
         Returns:
             反思结果，包含评估和改进建议
         """
-        self.logger.info(f"开始反思任务: {task.name} (ID: {task.id})")
+        self.logger.info(f"开始反思任务: {task['name']} (ID: {task['id']})")
 
         reflection_result = {
-            'task_id': task.id,
-            'task_name': task.name,
+            'task_id': task['id'],
+            'task_name': task['name'],
             'execution_time': result.get('execution_time', 0),
             'status': result.get('status', 'unknown'),
             'timestamp': time.time(),
@@ -56,30 +55,30 @@ class Reflector:
         if result.get('status') == 'success':
             reflection_result['evaluation']['result_quality'] = 'good'
             reflection_result['learning_points'].append(
-                f"工具 {task.tool_name} 对于 {task.description} 任务表现良好")
+                f"工具 {task['tool_name']} 对于 {task.get('description', '无描述')} 任务表现良好")
         else:
             reflection_result['evaluation']['result_quality'] = 'poor'
             reflection_result['improvements'].append(
-                f"需要改进工具 {task.tool_name} 的错误处理")
+                f"需要改进工具 {task['tool_name']} 的错误处理")
             reflection_result['learning_points'].append(
-                f"工具 {task.tool_name} 在处理 {task.description} 任务时失败")
+                f"工具 {task['tool_name']} 在处理 {task.get('description', '无描述')} 任务时失败")
 
         # 保存反思结果
         self.memory_manager.save_intermediate_result(
             'system',
-            f"reflection_{task.id}",
+            f"reflection_{task['id']}",
             reflection_result
         )
 
-        self.logger.info(f"任务 {task.name} 反思完成")
+        self.logger.info(f"任务 {task['name']} 反思完成")
         return reflection_result
 
-    def reflect_on_plan_execution(self, tasks: List[Task], results: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def reflect_on_plan_execution(self, tasks: List[Dict[str, Any]], results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         反思整个计划的执行结果
 
         Args:
-            tasks: 执行的任务列表
+            tasks: 执行的任务列表（字典格式）
             results: 任务执行结果列表
 
         Returns:

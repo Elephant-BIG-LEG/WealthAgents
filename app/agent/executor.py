@@ -1,12 +1,9 @@
 """
 财富Agent - 智能投研分析平台
 私人Agent模块 - 执行器组件
-负责执行规划器生成的任务
-TODO 使用LLM模型评估当前信息是否足够回答用户问题，识别知识缺口并生成后续查询
-
+负责管理工具和执行任务
 """
 from typing import Dict, Any, List, Optional
-from .planner import Task
 from .memory import MemoryManager
 import time
 import logging
@@ -18,11 +15,11 @@ class ToolNotFoundError(Exception):
 
 
 class Executor:
-    """任务执行器 - 负责执行规划器生成的任务"""
+    """执行器 - 负责管理工具和执行任务"""
 
     def __init__(self, memory_manager: MemoryManager):
         self.memory_manager = memory_manager
-        self.tools = {}  # 工具注册表
+        self.tools: Dict[str, callable] = {}
         self.logger = logging.getLogger(__name__)
 
     def register_tool(self, name: str, tool_func):
@@ -36,35 +33,35 @@ class Executor:
         self.tools[name] = tool_func
         self.logger.info(f"工具 {name} 已注册")
 
-    def execute_task(self, task: Task) -> Dict[str, Any]:
+    def execute_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """
         执行单个任务
 
         Args:
-            task: 要执行的任务
+            task: 要执行的任务（字典格式）
 
         Returns:
             执行结果
         """
-        self.logger.info(f"开始执行任务: {task.name} (ID: {task.id})")
+        self.logger.info(f"开始执行任务: {task['name']} (ID: {task['id']})")
 
         # 检查所需工具是否存在
-        if task.tool_name not in self.tools:
-            raise ToolNotFoundError(f"工具 '{task.tool_name}' 未注册")
+        if task['tool_name'] not in self.tools:
+            raise ToolNotFoundError(f"工具 '{task['tool_name']}' 未注册")
 
         try:
             # 获取依赖任务的结果
             dependency_results = {}
-            for dep_id in task.dependencies:
+            for dep_id in task['dependencies']:
                 dep_result = self.memory_manager.get_task_result(dep_id)
                 if dep_result is not None:
                     dependency_results[dep_id] = dep_result
 
             # 执行工具函数
-            tool_func = self.tools[task.tool_name]
+            tool_func = self.tools[task['tool_name']]
 
             # 合并参数：依赖结果 + 任务参数
-            execution_params = {**task.parameters}
+            execution_params = {**task['parameters']}
             if dependency_results:
                 execution_params['dependency_results'] = dependency_results
 
@@ -74,26 +71,26 @@ class Executor:
 
             # 保存执行结果到记忆管理器
             task_result = {
-                'task_id': task.id,
-                'task_name': task.name,
+                'task_id': task['id'],
+                'task_name': task['name'],
                 'result': result,
                 'execution_time': execution_time,
                 'status': 'success',
                 'timestamp': time.time()
             }
 
-            self.memory_manager.save_task_result(task.id, task_result)
+            self.memory_manager.save_task_result(task['id'], task_result)
 
-            self.logger.info(f"任务 {task.name} 执行成功，耗时 {execution_time:.2f} 秒")
+            self.logger.info(f"任务 {task['name']} 执行成功，耗时 {execution_time:.2f} 秒")
             return task_result
 
         except Exception as e:
-            self.logger.error(f"任务 {task.name} 执行失败: {str(e)}")
+            self.logger.error(f"任务 {task['name']} 执行失败: {str(e)}")
 
             # 记录失败结果
             error_result = {
-                'task_id': task.id,
-                'task_name': task.name,
+                'task_id': task['id'],
+                'task_name': task['name'],
                 'result': None,
                 'execution_time': 0,
                 'status': 'error',
@@ -104,12 +101,12 @@ class Executor:
             self.memory_manager.save_task_result(task.id, error_result)
             raise e
 
-    def execute_plan(self, tasks: List[Task]) -> List[Dict[str, Any]]:
+    def execute_plan(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         执行任务计划
 
         Args:
-            tasks: 任务列表
+            tasks: 任务列表（字典格式）
 
         Returns:
             所有任务的执行结果
@@ -122,25 +119,24 @@ class Executor:
             try:
                 # 检查依赖任务是否已完成
                 missing_deps = []
-                for dep_id in task.dependencies:
+                for dep_id in task['dependencies']:
                     if self.memory_manager.get_task_result(dep_id) is None:
                         missing_deps.append(dep_id)
 
                 if missing_deps:
-                    raise Exception(f"任务 {task.name} 依赖的任务未完成: {missing_deps}")
+                    raise Exception(f"任务 {task['name']} 依赖的任务未完成: {missing_deps}")
 
                 # 执行当前任务
                 result = self.execute_task(task)
                 results.append(result)
-
-                # 更新进度（在实际应用中可以发送给前端）
-                progress = (i + 1) / len(tasks) * 100
-                self.logger.info(f"任务执行进度: {progress:.1f}%")
+                # 任务处理结果
+                logging.info(f"任务{task['name']}处理结果：{result}")
 
             except Exception as e:
-                self.logger.error(f"执行任务 {task.name} 时发生错误: {str(e)}")
+                self.logger.error(f"执行任务 {task['name']} 时发生错误: {str(e)}")
                 # 在实际应用中，可以选择继续执行后续任务或停止
                 raise e
 
         self.logger.info("任务计划执行完成")
         return results
+
