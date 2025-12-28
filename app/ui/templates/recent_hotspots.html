@@ -186,71 +186,14 @@
                     <p class="mb-1"><strong>投资建议：</strong>${hotspot.investment_advice || '暂无建议'}</p>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header">
-                        <span><i class="fas fa-chart-pie"></i> 影响分析</span>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container">
-                            <canvas id="impactChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="card mt-4">
-                    <div class="card-header">
-                        <span><i class="fas fa-clock"></i> 时间线</span>
-                    </div>
-                    <div class="card-body">
-                        <ul class="list-unstyled">
-                            <li class="mb-2">
-                                <small class="text-muted">采集时间</small>
-                                <br><strong>${hotspot.collection_time || hotspot.date || '未知'}</strong>
-                            </li>
-                            <li class="mb-2">
-                                <small class="text-muted">分析时间</small>
-                                <br><strong>${hotspot.analysis_time || '未知'}</strong>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
+
         </div>
     `;
 
-        // 初始化图表
-        initImpactChart();
+
     }
 
-    function initImpactChart() {
-        const ctx = document.getElementById('impactChart');
-        if (ctx) {
-            new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['积极影响', '消极影响', '中性影响'],
-                    datasets: [{
-                        data: [45, 25, 30],
-                        backgroundColor: [
-                            '#10b981',
-                            '#ef4444',
-                            '#6b7280'
-                        ]
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom'
-                        }
-                    }
-                }
-            });
-        }
-    }
+
 
     function filterHotspots(filter) {
         // 简单实现筛选功能

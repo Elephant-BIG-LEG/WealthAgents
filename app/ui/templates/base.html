@@ -263,59 +263,49 @@
                 <h3><i class="fas fa-chart-line"></i> 智能投研平台</h3>
             </div>
             <div class="sidebar-nav">
-                <div class="nav-item">
-                    <a href="/" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">
-                        <i class="fas fa-home"></i>
-                        <span>仪表盘</span>
-                    </a>
-                </div>
-                <div class="nav-item">
-                    <a href="/data-collection"
-                        class="nav-link {% if active_page == 'data-collection' %}active{% endif %}">
-                        <i class="fas fa-cloud-download-alt"></i>
-                        <span>数据采集</span>
-                    </a>
-                </div>
-                <div class="nav-item">
-                    <a href="/recent-hotspots"
-                        class="nav-link {% if active_page == 'recent-hotspots' %}active{% endif %}">
-                        <i class="fas fa-fire"></i>
-                        <span>近期热点</span>
-                    </a>
-                </div>
-                <div class="nav-item">
-                    <a href="/stock-analysis"
-                        class="nav-link {% if active_page == 'stock-analysis' %}active{% endif %}">
-                        <i class="fas fa-chart-bar"></i>
-                        <span>股票分析</span>
-                    </a>
-                </div>
-                <div class="nav-item">
-                    <a href="/financial-analysis"
-                        class="nav-link {% if active_page == 'financial-analysis' %}active{% endif %}">
-                        <i class="fas fa-file-invoice-dollar"></i>
-                        <span>财务分析</span>
-                    </a>
-                </div>
-                <div class="nav-item">
-                    <a href="/private-agent" class="nav-link {% if active_page == 'private-agent' %}active{% endif %}">
-                        <i class="fas fa-robot"></i>
-                        <span>私人Agent</span>
-                    </a>
-                </div>
-                <div class="nav-item">
-                    <a href="/historical-data"
-                        class="nav-link {% if active_page == 'historical-data' %}active{% endif %}">
-                        <i class="fas fa-history"></i>
-                        <span>往期数据</span>
-                    </a>
-                </div>
-                <div class="nav-item">
-                    <a href="/settings" class="nav-link {% if active_page == 'settings' %}active{% endif %}">
-                        <i class="fas fa-cog"></i>
-                        <span>设置</span>
-                    </a>
-                </div>
+                <ul class="nav flex-column">
+                    <!-- 导航链接 -->
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'dashboard' %}active{% endif %}" href="/dashboard">
+                            <i class="fas fa-chart-line"></i> 仪表盘
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'data-collection' %}active{% endif %}"
+                            href="/data-collection">
+                            <i class="fas fa-database"></i> 数据采集
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'recent-hotspots' %}active{% endif %}"
+                            href="/recent-hotspots">
+                            <i class="fas fa-fire"></i> 近期热点
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'stock-analysis' %}active{% endif %}"
+                            href="/stock-analysis">
+                            <i class="fas fa-chart-bar"></i> 股票分析
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'company-knowledge' %}active{% endif %}"
+                            href="/company-knowledge">
+                            <i class="fas fa-building"></i> 公司知识库
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'private-agent' %}active{% endif %}"
+                            href="/private-agent">
+                            <i class="fas fa-robot"></i> 私人Agent
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'settings' %}active{% endif %}" href="/settings">
+                            <i class="fas fa-cog"></i> 设置
+                        </a>
+                    </li>
+                </ul>
             </div>
         </nav>
 

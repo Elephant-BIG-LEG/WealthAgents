@@ -157,4 +157,4 @@ def data_parsing_tool(text: str = "", **kwargs) -> Dict[str, Any]:
 
     tool = DataParsingTool()
     return tool.parse_financial_text(text_to_parse, **kwargs)
-
+
