@@ -1,2 +1,0 @@
-# 创建全局实例供外部使用
-financial_document_processor = FinancialDocumentProcessor()
