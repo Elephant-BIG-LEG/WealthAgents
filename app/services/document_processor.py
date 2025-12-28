@@ -1,5 +1,6 @@
 import os
 import re
+import json
 from typing import Dict, List, Any, Tuple, Optional
 import logging
 
@@ -11,9 +12,10 @@ logger = logging.getLogger(__name__)
 支持常见的文档格式如TXT、PDF、DOCX等
 """
 
+
 class DocumentProcessor:
     """文档处理器类，支持从多种格式文件中提取文本"""
-    
+
     def __init__(self):
         """初始化文档处理器"""
         # 支持的文件类型及其对应的处理方法
@@ -24,15 +26,15 @@ class DocumentProcessor:
             '.json': self._process_json,
             '.csv': self._process_csv,
         }
-    
+
     def process_file(self, file_path: str, file_name: Optional[str] = None) -> Dict[str, Any]:
         """
         处理文件并提取文本内容
-        
+
         参数：
         - file_path: 文件路径
         - file_name: 文件名（可选，默认使用文件路径中的文件名）
-        
+
         返回：
         - 包含文件名和提取的文本内容的字典
         """
@@ -40,10 +42,10 @@ class DocumentProcessor:
             # 确定文件名
             if not file_name:
                 file_name = os.path.basename(file_path)
-            
+
             # 获取文件扩展名
             _, ext = os.path.splitext(file_name.lower())
-            
+
             # 检查是否支持该文件类型
             if ext not in self.supported_extensions:
                 logger.warning(f"不支持的文件类型: {ext}")
@@ -53,16 +55,16 @@ class DocumentProcessor:
                     'error': f"不支持的文件类型: {ext}",
                     'status': 'unsupported'
                 }
-            
+
             # 调用对应的处理方法
             content = self.supported_extensions[ext](file_path)
-            
+
             return {
                 'file_name': file_name,
                 'content': content,
                 'status': 'success'
             }
-        
+
         except Exception as e:
             logger.error(f"处理文件 {file_path} 时出错: {str(e)}")
             return {
@@ -71,14 +73,14 @@ class DocumentProcessor:
                 'error': str(e),
                 'status': 'error'
             }
-    
+
     def process_multiple_files(self, file_paths: List[str]) -> List[Dict[str, Any]]:
         """
         批量处理多个文件
-        
+
         参数：
         - file_paths: 文件路径列表
-        
+
         返回：
         - 处理结果列表，每个结果包含文件名和提取的文本内容
         """
@@ -86,14 +88,14 @@ class DocumentProcessor:
         for file_path in file_paths:
             results.append(self.process_file(file_path))
         return results
-    
+
     def _process_txt(self, file_path: str) -> str:
         """处理文本文件"""
         try:
             # 尝试不同编码读取文件
             encodings = ['utf-8', 'gbk', 'gb2312', 'latin-1']
             content = ''
-            
+
             for encoding in encodings:
                 try:
                     with open(file_path, 'r', encoding=encoding) as f:
@@ -101,15 +103,15 @@ class DocumentProcessor:
                     break
                 except UnicodeDecodeError:
                     continue
-            
+
             # 规范化文本（去除多余空白字符等）
             content = self._normalize_text(content)
             return content
-        
+
         except Exception as e:
             logger.error(f"处理文本文件时出错: {str(e)}")
             return ''
-    
+
     def _process_pdf(self, file_path: str) -> str:
         """处理PDF文件"""
         try:
@@ -130,11 +132,11 @@ class DocumentProcessor:
             except Exception as e:
                 logger.error(f"使用PyPDF2处理PDF时出错: {str(e)}")
                 return "[PDF文件处理失败]"
-        
+
         except Exception as e:
             logger.error(f"处理PDF文件时出错: {str(e)}")
             return ''
-    
+
     def _process_docx(self, file_path: str) -> str:
         """处理DOCX文件"""
         try:
@@ -153,11 +155,11 @@ class DocumentProcessor:
             except Exception as e:
                 logger.error(f"使用python-docx处理DOCX时出错: {str(e)}")
                 return "[DOCX文件处理失败]"
-        
+
         except Exception as e:
             logger.error(f"处理DOCX文件时出错: {str(e)}")
             return ''
-    
+
     def _process_json(self, file_path: str) -> str:
         """处理JSON文件"""
         try:
@@ -168,7 +170,7 @@ class DocumentProcessor:
         except Exception as e:
             logger.error(f"处理JSON文件时出错: {str(e)}")
             return ''
-    
+
     def _process_csv(self, file_path: str) -> str:
         """处理CSV文件"""
         try:
@@ -176,7 +178,7 @@ class DocumentProcessor:
             content = []
             # 尝试不同编码读取CSV
             encodings = ['utf-8', 'gbk', 'gb2312']
-            
+
             for encoding in encodings:
                 try:
                     with open(file_path, 'r', newline='', encoding=encoding) as csvfile:
@@ -186,12 +188,12 @@ class DocumentProcessor:
                     break
                 except UnicodeDecodeError:
                     continue
-            
+
             return '\n'.join(content)
         except Exception as e:
             logger.error(f"处理CSV文件时出错: {str(e)}")
             return ''
-    
+
     def _normalize_text(self, text: str) -> str:
         """
         规范化文本内容
@@ -214,13 +216,14 @@ class DocumentProcessor:
 提供文件上传和临时存储功能
 """
 
+
 class FileUploadHandler:
     """文件上传处理器"""
-    
+
     def __init__(self, upload_dir: str = 'temp_uploads'):
         """
         初始化文件上传处理器
-        
+
         参数：
         - upload_dir: 临时上传目录
         """
@@ -228,15 +231,15 @@ class FileUploadHandler:
         # 确保上传目录存在
         if not os.path.exists(upload_dir):
             os.makedirs(upload_dir)
-    
+
     def save_uploaded_file(self, file_content: bytes, file_name: str) -> str:
         """
         保存上传的文件
-        
+
         参数：
         - file_content: 文件内容（字节形式）
         - file_name: 文件名
-        
+
         返回：
         - 保存的文件路径
         """
@@ -244,17 +247,17 @@ class FileUploadHandler:
             # 为了安全，清理文件名
             safe_filename = self._sanitize_filename(file_name)
             file_path = os.path.join(self.upload_dir, safe_filename)
-            
+
             # 保存文件
             with open(file_path, 'wb') as f:
                 f.write(file_content)
-            
+
             return file_path
-        
+
         except Exception as e:
             logger.error(f"保存上传文件 {file_name} 时出错: {str(e)}")
             raise
-    
+
     def _sanitize_filename(self, filename: str) -> str:
         """
         清理文件名，移除可能的恶意字符
@@ -267,7 +270,7 @@ class FileUploadHandler:
             name, ext = os.path.splitext(filename)
             filename = name[:max_length - len(ext)] + ext
         return filename
-    
+
     def cleanup_uploads(self):
         """
         清理临时上传文件

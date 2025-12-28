@@ -69,7 +69,7 @@ class ResponseGenerator:
                 # 检查任务状态和结果格式
                 # 任务结构可能是直接包含parsed_data，或者是执行器返回的完整结果
                 task_result_data = None
-                                
+
                 if "result" in task and isinstance(task["result"], dict):
                     # 检查是否直接在task["result"]中包含parsed_data
                     if "parsed_data" in task["result"]:
@@ -78,7 +78,7 @@ class ResponseGenerator:
                     elif "result" in task["result"] and isinstance(task["result"]["result"], dict):
                         if "parsed_data" in task["result"]["result"]:
                             task_result_data = task["result"]["result"]
-                                
+
                 if task_result_data:
 
                     parsed_data = task_result_data["parsed_data"]

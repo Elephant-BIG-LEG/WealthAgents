@@ -14,9 +14,11 @@ DB_CONFIG = {
     'port': int(os.getenv('DB_PORT', '13306')),
     'user': os.getenv('DB_USER', 'root'),
     'password': os.getenv('DB_PASSWORD', 'abc123'),
-    'database': os.getenv('DB_NAME', 'FinanceData')
+    'database': os.getenv('DB_NAME', 'FinanceData'),
+    'charset': 'utf8mb4'  # 添加charset参数修复连接错误
 }
 
 # 其他配置
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here')
+

@@ -361,30 +361,64 @@
         const uploadProgressModal = new bootstrap.Modal(document.getElementById('upload-progress-modal'));
         document.getElementById('upload-btn').addEventListener('click', function () {
             const files = document.getElementById('document-upload').files;
+            const companyId = selectedCompanySelect.value;
+            const documentType = document.getElementById('document-type').value;
+
             if (files.length > 0 && currentCompany) {
                 uploadProgressModal.show();
-                let progress = 0;
+
+                // 创建FormData对象
+                const formData = new FormData();
+                formData.append('company_name', currentCompany.name);
+
+                for (let i = 0; i < files.length; i++) {
+                    formData.append('documents', files[i]);
+                }
+
+                // 更新进度条
                 const progressBar = document.getElementById('upload-progress-bar');
                 const progressText = document.getElementById('upload-progress-text');
 
                 // 模拟上传进度
+                let progress = 0;
                 const interval = setInterval(() => {
-                    progress += 10;
+                    progress += 5;
                     progressBar.style.width = `${progress}%`;
                     progressBar.setAttribute('aria-valuenow', progress);
                     progressText.textContent = `上传中... ${progress}%`;
 
-                    if (progress >= 100) {
+                    if (progress >= 90) {
                         clearInterval(interval);
-                        progressText.textContent = '上传完成，正在处理文档...';
+                    }
+                }, 200);
+
+                // 发送上传请求
+                fetch('/api/company/knowledge/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        clearInterval(interval);
+                        progressBar.style.width = '100%';
+                        progressBar.setAttribute('aria-valuenow', 100);
+                        progressText.textContent = '处理完成';
 
                         setTimeout(() => {
                             uploadProgressModal.hide();
-                            showMessage('文档上传成功', 'success');
-                            document.getElementById('document-upload').value = '';
-                        }, 1000);
-                    }
-                }, 300);
+                            if (data.code === 200) {
+                                showMessage(data.message || '文档上传和处理成功', 'success');
+                                document.getElementById('document-upload').value = '';
+                            } else {
+                                showMessage(data.message || '文档上传失败', 'danger');
+                            }
+                        }, 500);
+                    })
+                    .catch(error => {
+                        clearInterval(interval);
+                        uploadProgressModal.hide();
+                        showMessage('上传过程中发生错误: ' + error.message, 'danger');
+                    });
             } else {
                 showMessage('请选择文件', 'danger');
             }

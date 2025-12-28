@@ -1,10 +1,13 @@
 # 文本切片器 - 专为理财文章设计
 import re
 from typing import List, Dict, Tuple
+import logging
+
+logger = logging.getLogger(__name__)
 
 """
 TODO
-不能很好的切分，采用什么切分逻辑待确定
+不能很好地切分，采用什么切分逻辑待确定
 """
 class FinancialTextSplitter:
     """
@@ -250,24 +253,47 @@ class FinancialTextSplitter:
                     
         return text  # 如果找不到合适的词边界，返回原始文本
 
+# 创建全局切片器实例
+global_splitter = FinancialTextSplitter(
+    chunk_size=600,
+    chunk_overlap=100,
+    min_chunk_size=200,
+    preserve_sections=True,
+    preserve_tables=True,
+    dynamic_chunking=True
+)
+
 # 创建默认的切片器实例
-def create_financial_splitter():
+def create_financial_splitter(**kwargs) -> FinancialTextSplitter:
     """
     创建并返回一个默认配置的财经文本切片器
     """
-    return FinancialTextSplitter(
-        chunk_size=800,       # 理财文章切片稍小一些，保持更细粒度
-        chunk_overlap=150,    # 适当的重叠以保持连贯性
-        min_chunk_size=200,   # 最小切片大小
-        preserve_sections=True,  # 保持章节完整性
-        preserve_tables=True,    # 保持表格完整性
-        dynamic_chunking=True    # 启用动态切片长度
-    )
+    if kwargs:
+        return FinancialTextSplitter(**kwargs)
+    else:
+        return FinancialTextSplitter(
+            chunk_size=800,       # 理财文章切片稍小一些，保持更细粒度
+            chunk_overlap=150,    # 适当的重叠以保持连贯性
+            min_chunk_size=200,   # 最小切片大小
+            preserve_sections=True,  # 保持章节完整性
+            preserve_tables=True,    # 保持表格完整性
+            dynamic_chunking=True    # 启用动态切片长度
+        )
 
 # 简单的文本切片函数（方便直接调用）
 def split_financial_text(text: str, **kwargs) -> List[str]:
     """
     直接分割文本的便捷函数
     """
-    splitter = FinancialTextSplitter(**kwargs)
-    return splitter.split_text(text)
+    if kwargs:
+        # 如果提供了自定义参数，创建新实例
+        splitter = FinancialTextSplitter(**kwargs)
+        return splitter.split_text(text)
+    else:
+        # 使用全局实例
+        try:
+            return global_splitter.split_text(text)
+        except Exception as e:
+            logger.error(f"文本切片过程中出错: {e}")
+            # 出错时返回原文本作为单个切片
+            return [text] if text else []

@@ -3,6 +3,9 @@ from typing import List, Union
 import hashlib
 import pickle
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 """
 TODO
@@ -27,14 +30,18 @@ class TextVectorizer:
             try:
                 with open(self.cache_file, 'rb') as f:
                     return pickle.load(f)
-            except:
+            except Exception as e:
+                logger.warning(f"加载向量缓存失败: {e}")
                 return {}
         return {}
 
     def _save_cache(self):
         """保存向量缓存"""
-        with open(self.cache_file, 'wb') as f:
-            pickle.dump(self.vector_cache, f)
+        try:
+            with open(self.cache_file, 'wb') as f:
+                pickle.dump(self.vector_cache, f)
+        except Exception as e:
+            logger.warning(f"保存向量缓存失败: {e}")
 
     def _hash_text(self, text: str) -> str:
         """对文本进行哈希处理，用于缓存键"""
@@ -68,6 +75,9 @@ class TextVectorizer:
         :param text: 输入文本
         :return: 文本的向量表示
         """
+        if not text or len(text.strip()) == 0:
+            return np.zeros(self.vector_dim)
+            
         # 检查缓存
         text_hash = self._hash_text(text)
         if text_hash in self.vector_cache:
@@ -97,12 +107,16 @@ class TextVectorizer:
         :param vec2: 第二个向量
         :return: 余弦相似度 (0-1之间)
         """
-        # 确保向量归一化
-        vec1_norm = vec1 / np.linalg.norm(vec1)
-        vec2_norm = vec2 / np.linalg.norm(vec2)
+        try:
+            # 确保向量归一化
+            vec1_norm = vec1 / np.linalg.norm(vec1)
+            vec2_norm = vec2 / np.linalg.norm(vec2)
 
-        # 计算余弦相似度
-        return float(np.dot(vec1_norm, vec2_norm))
+            # 计算余弦相似度
+            return float(np.dot(vec1_norm, vec2_norm))
+        except Exception as e:
+            logger.error(f"计算相似度时出错: {e}")
+            return 0.0
 
     def find_similar_texts(self, query_text: str, candidate_texts: List[str], top_k: int = 5) -> List[tuple]:
         """
@@ -112,48 +126,81 @@ class TextVectorizer:
         :param top_k: 返回最相似的前k个结果
         :return: (文本, 相似度) 的元组列表
         """
-        # 向量化查询文本
-        query_vector = self.vectorize_text(query_text)
+        try:
+            # 向量化查询文本
+            query_vector = self.vectorize_text(query_text)
 
-        # 向量化候选文本
-        candidate_vectors = self.vectorize_texts(candidate_texts)
+            # 向量化候选文本
+            candidate_vectors = self.vectorize_texts(candidate_texts)
 
-        # 计算相似度
-        similarities = []
-        for i, (text, vector) in enumerate(zip(candidate_texts, candidate_vectors)):
-            sim = self.similarity(query_vector, vector)
-            similarities.append((text, sim, i))
+            # 计算相似度
+            similarities = []
+            for i, (text, vector) in enumerate(zip(candidate_texts, candidate_vectors)):
+                sim = self.similarity(query_vector, vector)
+                similarities.append((text, sim, i))
 
-        # 按相似度排序并返回top_k
-        similarities.sort(key=lambda x: x[1], reverse=True)
-        return similarities[:top_k]
+            # 按相似度排序并返回top_k
+            similarities.sort(key=lambda x: x[1], reverse=True)
+            return similarities[:top_k]
+        except Exception as e:
+            logger.error(f"查找相似文本时出错: {e}")
+            return [(text, 0.0, i) for i, text in enumerate(candidate_texts[:top_k])]
 
+# 创建全局向量化器实例
+global_vectorizer = TextVectorizer(vector_dim=128)
 
+# 创建默认的向量化器实例
+def create_text_vectorizer(**kwargs) -> TextVectorizer:
+    """
+    创建并返回一个默认配置的文本向量化器
+    """
+    if kwargs:
+        return TextVectorizer(**kwargs)
+    else:
+        return TextVectorizer(vector_dim=128)
+
+# 向量化数据的主要接口函数
 def vectorize_data(texts: List[str]) -> List[np.ndarray]:
     """
     向量化数据的主要接口函数
     :param texts: 需要向量化的文本列表
     :return: 向量列表
     """
-    vectorizer = TextVectorizer()
-    return vectorizer.vectorize_texts(texts)
+    if not texts:
+        return []
+        
+    try:
+        # 使用全局实例
+        return global_vectorizer.vectorize_texts(texts)
+    except Exception as e:
+        logger.error(f"向量化数据过程中出错: {e}")
+        # 出错时返回空向量列表
+        return [np.zeros(128) for _ in texts]
 
-
+# 将向量保存到文件
 def save_vectors_to_file(vectors: List[np.ndarray], filename: str):
     """
     将向量保存到文件
     :param vectors: 向量列表
     :param filename: 保存文件名
     """
-    with open(filename, 'wb') as f:
-        pickle.dump(vectors, f)
+    try:
+        with open(filename, 'wb') as f:
+            pickle.dump(vectors, f)
+    except Exception as e:
+        logger.error(f"保存向量到文件失败: {e}")
+        raise
 
-
+# 从文件加载向量
 def load_vectors_from_file(filename: str) -> List[np.ndarray]:
     """
     从文件加载向量
     :param filename: 文件名
     :return: 向量列表
     """
-    with open(filename, 'rb') as f:
-        return pickle.load(f)
+    try:
+        with open(filename, 'rb') as f:
+            return pickle.load(f)
+    except Exception as e:
+        logger.error(f"从文件加载向量失败: {e}")
+        raise

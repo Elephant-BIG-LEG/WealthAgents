@@ -4,6 +4,8 @@ UI模块 - Web应用主入口
 集成Plan → Act → Reflect决策闭环的私人Agent
 """
 
+from app.api.company_api import register_company_api
+from app.api.financial_api import financial_api_bp
 from app.config.config import DB_CONFIG
 from app.ingest.source import Source
 from app.ingest.web_fetcher import Collection_action_llm
@@ -17,7 +19,9 @@ import sys
 import traceback
 import datetime
 
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, render_template, request, jsonify, send_from_directory
+import os
+import logging
 from datetime import datetime
 
 # 添加项目根目录到Python路径
@@ -35,6 +39,12 @@ print(f"Template directory: {template_dir}")  # 调试信息
 
 app = Flask(__name__, template_folder=template_dir)
 
+# 导入financial_api蓝图并注册
+app.register_blueprint(financial_api_bp, url_prefix='/api/financial')
+
+# 导入company_api蓝图并注册
+register_company_api(app)
+
 # 创建全局Agent实例
 agent = PrivateAgent()
 
@@ -46,158 +56,179 @@ DB_CONFIG = DB_CONFIG
 
 def get_db_connection():
     try:
-        # 使用pymysql直接连接
-        import pymysql
+        import pymysql.cursors
+        # 创建连接对象
         conn = pymysql.connect(
             host=DB_CONFIG['host'],
             port=DB_CONFIG['port'],
             user=DB_CONFIG['user'],
             password=DB_CONFIG['password'],
             database=DB_CONFIG['database'],
-            charset='utf8mb4',
-            cursorclass=pymysql.cursors.DictCursor
+            charset=DB_CONFIG['charset'],
+            cursorclass=pymysql.cursors.DictCursor  # 返回字典格式的结果
         )
         return conn
     except Exception as e:
-        logging.error(f"数据库连接失败: {str(e)}")
+        logger.error(f"数据库连接失败: {str(e)}")
         return None
 
 
-# 处理跨域预检请求
-
-
-@app.after_request
-def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers',
-                         'Content-Type,Authorization')
-    response.headers.add('Access-Control-Allow-Methods',
-                         'GET,PUT,POST,DELETE,OPTIONS')
-    return response
-
-
-# 处理OPTIONS预检请求
-
-
-@app.route('/collect', methods=['OPTIONS'])
-def collect_options():
-    from werkzeug.wrappers import Response
-    response = Response()
-    response.status_code = 200
-    return response
-
-
 # 配置日志
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
-# 全局变量存储采集的数据
+# 全局变量 - 用于临时存储采集的数据
 collected_data = []
 
-# 初始化数据处理和总结助手
-parser_helper = LangChainHelperWithIntegration()
-summarizer_helper = LangChainHelperWithSummary()
-
-# 主页路由 - 仪表盘
+# 主页路由
 
 
 @app.route('/')
-def index():
-    return render_template('dashboard.html')
+def dashboard():
+    try:
+        # 渲染仪表盘模板
+        return render_template('dashboard.html')
+    except Exception as e:
+        logger.error(f"渲染仪表盘页面时发生错误: {str(e)}")
+        return f"错误: {str(e)}", 500
 
 
-# 数据采集页面
-
-
-@app.route('/data-collection')
+@app.route('/data_collection')
 def data_collection():
-    return render_template('data_collection.html')
+    try:
+        # 渲染数据采集页面
+        return render_template('data_collection.html')
+    except Exception as e:
+        logger.error(f"渲染数据采集页面时发生错误: {str(e)}")
+        return f"错误: {str(e)}", 500
 
 
-# 近期热点页面
-
-
-@app.route('/recent-hotspots')
-def recent_hotspots():
-    return render_template('recent_hotspots.html')
-
-
-# 股票分析页面
-
-
-@app.route('/stock-analysis')
+@app.route('/stock_analysis')
 def stock_analysis():
-    return render_template('stock_analysis.html')
+    try:
+        # 渲染股票分析页面
+        return render_template('stock_analysis.html')
+    except Exception as e:
+        logger.error(f"渲染股票分析页面时发生错误: {str(e)}")
+        return f"错误: {str(e)}", 500
 
 
-# 财务分析页面
+@app.route('/stock-analysis', methods=['GET'])
+def stock_analysis_alias():
+    """股票分析页面路由别名"""
+    return stock_analysis()
 
 
-@app.route('/financial-analysis')
-def financial_analysis():
-    return render_template('financial_analysis.html')
+@app.route('/recent-hotspots', methods=['GET'])
+def recent_hotspots():
+    """热点资讯页面"""
+    try:
+        return render_template('recent_hotspots.html')
+    except Exception as e:
+        logger.error(f"加载热点资讯页面失败: {str(e)}")
+        return "无法加载热点资讯页面", 500
 
 
-# 私人Agent页面
+@app.route('/data-collection', methods=['GET'])
+def data_collection_page():
+    """数据采集页面"""
+    try:
+        return render_template('data_collection.html')
+    except Exception as e:
+        logger.error(f"加载数据采集页面失败: {str(e)}")
+        return "无法加载数据采集页面", 500
 
 
-@app.route('/private-agent')
+@app.route('/settings', methods=['GET'])
+def settings_page():
+    """设置页面"""
+    try:
+        return render_template('settings.html')
+    except Exception as e:
+        logger.error(f"加载设置页面失败: {str(e)}")
+        return "无法加载设置页面", 500
+
+
+@app.route('/company-knowledge', methods=['GET'])
+def company_knowledge_page():
+    """公司知识库页面"""
+    try:
+        return render_template('company_knowledge.html')
+    except Exception as e:
+        logger.error(f"加载公司知识库页面失败: {str(e)}")
+        return "无法加载公司知识库页面", 500
+
+
+@app.route('/private_agent')
 def private_agent():
-    return render_template('private_agent.html')
+    """私人代理页面"""
+    try:
+        # 渲染私人Agent页面
+        return render_template('private_agent.html')
+    except Exception as e:
+        logger.error(f"渲染私人Agent页面时发生错误: {str(e)}")
+        return "无法渲染私人Agent页面", 500
+
+# 添加private-agent路径别名
 
 
-# 往期数据页面
+@app.route('/private-agent', methods=['GET'])
+def private_agent_alias():
+    """私人代理页面路由别名"""
+    return private_agent()
 
 
-@app.route('/historical-data')
-def historical_data():
-    return render_template('historical_data.html')
+# API路由 - Agent聊天
 
-
-# 设置页面
-
-
-@app.route('/settings')
-def settings():
-    return render_template('settings.html')
-
-
-# 新增：私人Agent API端点 - 处理与Agent的交互
 @app.route('/api/agent/chat', methods=['POST'])
 def agent_chat():
-    """
-    与私人Agent的聊天API端点
-    接收用户消息并返回Agent的响应
-    """
     try:
-        data = request.get_json()
-        user_message = data.get('message', '')
-        session_id = data.get('session_id')  # 可选的会话ID
+        # 记录请求信息
+        logger.info("收到Agent聊天请求")
+        logger.info(f"请求方法: {request.method}")
+        logger.info(f"Content-Type: {request.content_type}")
 
-        if not user_message:
-            return jsonify({
-                'success': False,
-                'message': '消息内容不能为空'
-            })
-
-        # 调用Agent进行处理
-        # TODO
-        response = agent.chat(user_message, session_id)
-
-        if response['status'] == 'success':
-            return jsonify({
-                'success': True,
-                'response': response['response'],
-                'session_id': response['session_id'],
-                'detailed_result': response.get('detailed_result', {})
-            })
+        # 解析请求参数
+        if request.is_json:
+            data = request.get_json()
+            logger.info(f"JSON请求 - query: {data.get('query')}")
+            user_query = data.get('query')
         else:
+            # 处理表单数据
+            user_query = request.form.get('query')
+            logger.info(f"表单请求 - query: {user_query}")
+
+        # 验证必要参数
+        if not user_query:
             return jsonify({
                 'success': False,
-                'message': response.get('error_message', '处理请求时发生错误')
+                'message': '请输入查询内容',
+                'data': None
             })
 
+        # 调用Agent处理查询
+        logger.info(f"调用Agent处理查询: {user_query}")
+
+        # 使用全局Agent实例处理查询
+        response = agent.process_query(user_query)
+
+        # 构建返回结果
+        result = {
+            'success': True,
+            'message': '查询成功',
+            'data': {
+                'query': user_query,
+                'response': response
+            }
+        }
+
+        # 记录响应
+        logger.info(f"Agent响应: {response[:50]}...")
+
+        return jsonify(result)
     except Exception as e:
         logger.error(f"处理Agent聊天请求时发生错误: {str(e)}")
         return jsonify({
