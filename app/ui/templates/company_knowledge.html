@@ -1,0 +1,428 @@
+{% extends 'base.html' %}
+
+{% block title %}公司知识库管理 - 智能投研分析平台{% endblock %}
+
+{% block page_title %}
+<i class="fas fa-building"></i> 公司知识库管理
+{% endblock %}
+
+{% set active_page = 'company-knowledge' %}
+
+{% block content %}
+<div class="row">
+    <!-- 左侧公司列表 -->
+    <div class="col-lg-4">
+        <!-- 公司列表卡片 -->
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-list"></i> 公司列表
+                <button type="button" class="btn btn-sm btn-primary" id="add-company-btn">
+                    <i class="fas fa-plus"></i> 添加公司
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" placeholder="搜索公司..." id="company-search">
+                    <button class="btn btn-outline-secondary" type="button" id="search-btn">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+                <div class="list-group" id="company-list">
+                    <!-- 公司列表将通过JavaScript动态生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧文档上传和知识库查询 -->
+    <div class="col-lg-8">
+        <!-- 上传文档卡片 -->
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-upload"></i> 上传文档
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="selected-company" class="form-label">选择公司</label>
+                    <select class="form-select" id="selected-company" disabled>
+                        <option value="">请先选择公司</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="document-type" class="form-label">文档类型</label>
+                    <select class="form-select" id="document-type">
+                        <option value="annual_report">年报</option>
+                        <option value="quarterly_report">季报</option>
+                        <option value="industry_analysis">行业分析</option>
+                        <option value="news">新闻资讯</option>
+                        <option value="other">其他</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="document-upload" class="form-label">选择文件 (支持PDF, DOCX, TXT)</label>
+                    <input type="file" class="form-control" id="document-upload" multiple disabled>
+                </div>
+                <button type="button" class="btn btn-primary" id="upload-btn" disabled>
+                    <i class="fas fa-cloud-upload-alt"></i> 上传文档
+                </button>
+            </div>
+        </div>
+
+        <!-- 知识库查询卡片 -->
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-search"></i> 知识库查询
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="query-company" class="form-label">查询公司</label>
+                    <select class="form-select" id="query-company" disabled>
+                        <option value="">请先选择公司</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="query-input" class="form-label">查询问题</label>
+                    <input type="text" class="form-control" id="query-input" placeholder="输入您的问题..." disabled>
+                </div>
+                <button type="button" class="btn btn-primary" id="query-btn" disabled>
+                    <i class="fas fa-question-circle"></i> 查询
+                </button>
+
+                <!-- 查询结果区域 -->
+                <div class="mt-4" id="query-results" style="display: none;">
+                    <h5><i class="fas fa-lightbulb"></i> 查询结果</h5>
+                    <div class="mt-2 p-3 bg-light rounded" id="result-content">
+                        <!-- 查询结果将通过JavaScript动态生成 -->
+                    </div>
+                    <div class="mt-3">
+                        <h6><i class="fas fa-history"></i> 相关文档</h6>
+                        <ul class="list-group" id="related-documents">
+                            <!-- 相关文档列表将通过JavaScript动态生成 -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 添加公司模态框 -->
+<div class="modal fade" id="add-company-modal" tabindex="-1" aria-labelledby="add-company-modal-label"
+    aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="add-company-modal-label">添加公司</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="company-name" class="form-label">公司名称</label>
+                    <input type="text" class="form-control" id="company-name" placeholder="请输入公司名称">
+                </div>
+                <div class="mb-3">
+                    <label for="company-code" class="form-label">股票代码</label>
+                    <input type="text" class="form-control" id="company-code" placeholder="请输入股票代码">
+                </div>
+                <div class="mb-3">
+                    <label for="company-industry" class="form-label">所属行业</label>
+                    <input type="text" class="form-control" id="company-industry" placeholder="请输入所属行业">
+                </div>
+                <div class="mb-3">
+                    <label for="company-description" class="form-label">公司简介</label>
+                    <textarea class="form-control" id="company-description" rows="3" placeholder="请输入公司简介"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="save-company-btn">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 公司详情模态框 -->
+<div class="modal fade" id="company-detail-modal" tabindex="-1" aria-labelledby="company-detail-modal-label"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="company-detail-modal-label">公司详情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h6>基本信息</h6>
+                        <p><strong>公司名称:</strong> <span id="detail-company-name"></span></p>
+                        <p><strong>股票代码:</strong> <span id="detail-company-code"></span></p>
+                        <p><strong>所属行业:</strong> <span id="detail-company-industry"></span></p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>文档统计</h6>
+                        <p><strong>文档总数:</strong> <span id="detail-document-count"></span></p>
+                        <p><strong>知识片段:</strong> <span id="detail-chunk-count"></span></p>
+                        <p><strong>最后更新:</strong> <span id="detail-last-update"></span></p>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <h6>公司简介</h6>
+                    <p id="detail-company-description"></p>
+                </div>
+                <div>
+                    <h6>文档列表</h6>
+                    <div class="list-group" id="detail-document-list">
+                        <!-- 文档列表将通过JavaScript动态生成 -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" id="delete-company-btn">删除公司</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 上传进度模态框 -->
+<div class="modal fade" id="upload-progress-modal" tabindex="-1" aria-labelledby="upload-progress-modal-label"
+    aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="upload-progress-modal-label">上传进度</h5>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="progress">
+                        <div class="progress-bar" id="upload-progress-bar" role="progressbar" style="width: 0%"
+                            aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <div class="mt-2" id="upload-progress-text">准备上传...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // 模拟数据
+        const mockCompanies = [
+            { id: 1, name: '阿里巴巴', code: 'BABA', industry: '科技', description: '中国领先的电商巨头' },
+            { id: 2, name: '腾讯控股', code: '0700.HK', industry: '科技', description: '中国领先的互联网科技公司' },
+            { id: 3, name: '贵州茅台', code: '600519.SH', industry: '食品饮料', description: '中国著名的白酒企业' }
+        ];
+
+        // 渲染公司列表
+        const companyList = document.getElementById('company-list');
+        const selectedCompanySelect = document.getElementById('selected-company');
+        const queryCompanySelect = document.getElementById('query-company');
+
+        function renderCompanyList(companies) {
+            companyList.innerHTML = '';
+            selectedCompanySelect.innerHTML = '<option value="">请先选择公司</option>';
+            queryCompanySelect.innerHTML = '<option value="">请先选择公司</option>';
+
+            companies.forEach(company => {
+                // 添加到公司列表
+                const item = document.createElement('a');
+                item.href = '#';
+                item.className = 'list-group-item list-group-item-action';
+                item.innerHTML = `
+                    <div class="d-flex w-100 justify-content-between">
+                        <h5 class="mb-1">${company.name}</h5>
+                        <small>${company.code}</small>
+                    </div>
+                    <p class="mb-1">${company.industry}</p>
+                    <small>${company.description.substring(0, 30)}...</small>
+                `;
+                item.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    selectCompany(company);
+                });
+                companyList.appendChild(item);
+
+                // 添加到下拉菜单
+                const option1 = document.createElement('option');
+                option1.value = company.id;
+                option1.textContent = `${company.name} (${company.code})`;
+                selectedCompanySelect.appendChild(option1);
+
+                const option2 = document.createElement('option');
+                option2.value = company.id;
+                option2.textContent = `${company.name} (${company.code})`;
+                queryCompanySelect.appendChild(option2);
+            });
+
+            // 启用下拉菜单
+            if (companies.length > 0) {
+                selectedCompanySelect.disabled = false;
+                queryCompanySelect.disabled = false;
+            }
+        }
+
+        // 选择公司
+        let currentCompany = null;
+        function selectCompany(company) {
+            currentCompany = company;
+            selectedCompanySelect.value = company.id;
+            queryCompanySelect.value = company.id;
+            document.getElementById('document-upload').disabled = false;
+            document.getElementById('upload-btn').disabled = false;
+            document.getElementById('query-input').disabled = false;
+            document.getElementById('query-btn').disabled = false;
+        }
+
+        // 搜索公司
+        document.getElementById('search-btn').addEventListener('click', function () {
+            const searchTerm = document.getElementById('company-search').value.toLowerCase();
+            const filtered = mockCompanies.filter(company =>
+                company.name.toLowerCase().includes(searchTerm) ||
+                company.code.toLowerCase().includes(searchTerm) ||
+                company.industry.toLowerCase().includes(searchTerm)
+            );
+            renderCompanyList(filtered);
+        });
+
+        // 添加公司模态框
+        const addCompanyModal = new bootstrap.Modal(document.getElementById('add-company-modal'));
+        document.getElementById('add-company-btn').addEventListener('click', function () {
+            addCompanyModal.show();
+        });
+
+        // 保存公司
+        document.getElementById('save-company-btn').addEventListener('click', function () {
+            const name = document.getElementById('company-name').value;
+            const code = document.getElementById('company-code').value;
+            const industry = document.getElementById('company-industry').value;
+            const description = document.getElementById('company-description').value;
+
+            if (name && code) {
+                // 在实际应用中，这里会发送API请求保存公司
+                mockCompanies.push({
+                    id: mockCompanies.length + 1,
+                    name,
+                    code,
+                    industry,
+                    description
+                });
+
+                renderCompanyList(mockCompanies);
+
+                // 清空表单
+                document.getElementById('company-name').value = '';
+                document.getElementById('company-code').value = '';
+                document.getElementById('company-industry').value = '';
+                document.getElementById('company-description').value = '';
+
+                addCompanyModal.hide();
+                showMessage('公司添加成功', 'success');
+            } else {
+                showMessage('请填写公司名称和股票代码', 'danger');
+            }
+        });
+
+        // 公司详情模态框
+        const companyDetailModal = new bootstrap.Modal(document.getElementById('company-detail-modal'));
+        companyList.addEventListener('dblclick', function (e) {
+            if (currentCompany) {
+                document.getElementById('detail-company-name').textContent = currentCompany.name;
+                document.getElementById('detail-company-code').textContent = currentCompany.code;
+                document.getElementById('detail-company-industry').textContent = currentCompany.industry;
+                document.getElementById('detail-company-description').textContent = currentCompany.description;
+                document.getElementById('detail-document-count').textContent = '5';
+                document.getElementById('detail-chunk-count').textContent = '42';
+                document.getElementById('detail-last-update').textContent = new Date().toLocaleDateString();
+
+                // 模拟文档列表
+                const documentList = document.getElementById('detail-document-list');
+                documentList.innerHTML = '';
+                for (let i = 1; i <= 5; i++) {
+                    const item = document.createElement('div');
+                    item.className = 'list-group-item';
+                    item.innerHTML = `
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">${currentCompany.name}2023年${i}季度报告</h6>
+                            <span class="badge bg-primary">季报</span>
+                        </div>
+                        <small>上传时间: 2023-10-${10 + i}</small>
+                    `;
+                    documentList.appendChild(item);
+                }
+
+                companyDetailModal.show();
+            }
+        });
+
+        // 上传文档
+        const uploadProgressModal = new bootstrap.Modal(document.getElementById('upload-progress-modal'));
+        document.getElementById('upload-btn').addEventListener('click', function () {
+            const files = document.getElementById('document-upload').files;
+            if (files.length > 0 && currentCompany) {
+                uploadProgressModal.show();
+                let progress = 0;
+                const progressBar = document.getElementById('upload-progress-bar');
+                const progressText = document.getElementById('upload-progress-text');
+
+                // 模拟上传进度
+                const interval = setInterval(() => {
+                    progress += 10;
+                    progressBar.style.width = `${progress}%`;
+                    progressBar.setAttribute('aria-valuenow', progress);
+                    progressText.textContent = `上传中... ${progress}%`;
+
+                    if (progress >= 100) {
+                        clearInterval(interval);
+                        progressText.textContent = '上传完成，正在处理文档...';
+
+                        setTimeout(() => {
+                            uploadProgressModal.hide();
+                            showMessage('文档上传成功', 'success');
+                            document.getElementById('document-upload').value = '';
+                        }, 1000);
+                    }
+                }, 300);
+            } else {
+                showMessage('请选择文件', 'danger');
+            }
+        });
+
+        // 查询知识库
+        document.getElementById('query-btn').addEventListener('click', function () {
+            const query = document.getElementById('query-input').value;
+            if (query && currentCompany) {
+                const resultsContainer = document.getElementById('query-results');
+                const resultContent = document.getElementById('result-content');
+                const relatedDocuments = document.getElementById('related-documents');
+
+                resultsContainer.style.display = 'block';
+
+                // 模拟查询结果
+                resultContent.textContent = `根据${currentCompany.name}的知识库，${query}相关信息如下...`;
+
+                // 模拟相关文档
+                relatedDocuments.innerHTML = '';
+                for (let i = 1; i <= 3; i++) {
+                    const item = document.createElement('li');
+                    item.className = 'list-group-item';
+                    item.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>${currentCompany.name}2023年报告 - 第${i}部分</span>
+                            <small class="text-muted">相关性: ${90 - i * 10}%</small>
+                        </div>
+                    `;
+                    relatedDocuments.appendChild(item);
+                }
+            } else {
+                showMessage('请输入查询问题', 'danger');
+            }
+        });
+
+        // 初始化渲染
+        renderCompanyList(mockCompanies);
+    });
+</script>
+{% endblock %}
