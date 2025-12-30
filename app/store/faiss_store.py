@@ -15,52 +15,125 @@ TODO
 class FaissVectorStore:
     """基于Faiss的向量存储类"""
 
-    def __init__(self, dimension: int = 128, storage_path: str = "faiss_database"):
+    def _clean_path(self, path: str) -> str:
         """
-        初始化Faiss向量存储
-        :param dimension: 向量维度
-        :param storage_path: 存储路径
+        清理路径字符串 - 改进版本
+        - 处理路径中的空格
+        - 移除非法字符
+        - 标准化路径格式
         """
-        self.dimension = dimension
-        # 清理路径中的多余空格和规范化处理
-        clean_storage_path = self._clean_path(storage_path)
-        # 使用绝对路径和系统标准化路径处理
-        self.storage_path = os.path.abspath(os.path.normpath(clean_storage_path))
+        if not path:
+            return path
         
-        # 确保使用系统正确的路径分隔符
-        self.index_file = os.path.join(self.storage_path, "faiss_index.bin")
-        self.metadata_file = os.path.join(self.storage_path, "metadata.json")
+        # 使用正则表达式替换所有空格（包括连续空格）
+        import re
+        path = re.sub(r'\s+', '_', path)
+        
+        # 标准化路径
+        path = os.path.normpath(path)
+        
+        return path
 
-        # 创建存储目录（包括所有父目录）- 增强的目录创建逻辑
+    def _load_or_create_index(self):
+        """
+        加载或创建Faiss索引 - 简化版本，与_save_index保持一致的路径逻辑
+        """
+        try:
+            # 尝试从简单路径加载索引，与_save_index保持一致
+            simple_path = "faiss_index.bin"
+            print(f"\n_load_or_create_index: 尝试加载简单路径 = {simple_path}")
+            
+            # 检查文件是否存在且大小大于0
+            file_exists = os.path.exists(simple_path)
+            file_size = os.path.getsize(simple_path) if file_exists else 0
+            print(f"_load_or_create_index: 文件存在 = {file_exists}, 文件大小 = {file_size} 字节")
+            
+            if file_exists and file_size > 0:
+                # 尝试加载索引
+                try:
+                    index = faiss.read_index(simple_path)
+                    print(f"成功加载Faiss索引，包含 {index.ntotal} 个向量")
+                    # 更新索引文件路径以保持一致
+                    self.index_file = simple_path
+                    return index
+                except Exception as e:
+                    print(f"从简单路径加载索引时出错: {str(e)}")
+            
+            # 如果简单路径失败，尝试从固定路径加载
+            fixed_path = "C:\\faiss_index.bin"
+            print(f"_load_or_create_index: 尝试加载固定路径 = {fixed_path}")
+            
+            file_exists = os.path.exists(fixed_path)
+            file_size = os.path.getsize(fixed_path) if file_exists else 0
+            
+            if file_exists and file_size > 0:
+                try:
+                    index = faiss.read_index(fixed_path)
+                    print(f"成功从固定路径加载Faiss索引，包含 {index.ntotal} 个向量")
+                    self.index_file = fixed_path
+                    return index
+                except Exception as e:
+                    print(f"从固定路径加载索引时出错: {str(e)}")
+            
+            # 文件不存在、大小为0或加载失败，创建新索引
+            print(f"文件不存在、大小为0或加载失败，创建新的Faiss索引")
+            
+            # 使用内积索引，适合归一化向量的余弦相似度计算
+            # 使用IndexIDMap包装IndexFlatIP以支持add_with_ids
+            index = faiss.IndexIDMap(faiss.IndexFlatIP(self.dimension))
+            
+            # 保存新创建的空索引
+            self.index = index  # 临时设置self.index用于保存
+            self._save_index()
+            print(f"成功创建新的Faiss索引")
+            return index
+            
+        except Exception as e:
+            print(f"_load_or_create_index 方法出错: {str(e)}")
+            # 创建一个空索引作为后备
+            index = faiss.IndexIDMap(faiss.IndexFlatIP(self.dimension))
+            print(f"创建了空的Faiss索引作为后备")
+            return index
+    def __init__(self, dimension: int = 128, storage_path: str = "faiss_database"):
+        """初始化Faiss向量存储"""
+        self.dimension = dimension
+        
+        # 1. 严格清理存储路径 - 使用正则表达式替换所有空格
+        import re
+        clean_storage_path = re.sub(r'\s+', '_', storage_path)
+        print(f"DEBUG: 原始storage_path = {storage_path}")
+        print(f"DEBUG: 清理后storage_path = {clean_storage_path}")
+        
+        # 2. 使用系统标准化路径
+        clean_storage_path = os.path.normpath(clean_storage_path)
+        print(f"DEBUG: 标准化后storage_path = {clean_storage_path}")
+        
+        # 3. 使用当前工作目录作为基准创建路径
+        base_path = os.getcwd()
+        self.storage_path = os.path.join(base_path, clean_storage_path)
+        print(f"DEBUG: 最终storage_path = {self.storage_path}")
+        
+        # 4. 创建存储目录（包括所有父目录）- 增强的目录创建逻辑
         self._ensure_directory_exists()
         
-        # 初始化Faiss索引
+        # 5. 使用清理后的路径创建文件路径
+        self.index_file = os.path.join(self.storage_path, "faiss_index.bin")
+        self.metadata_file = os.path.join(self.storage_path, "metadata.json")
+        print(f"DEBUG: 最终index_file = {self.index_file}")
+        
+        # 6. 初始化Faiss索引
         self.index = self._load_or_create_index()
 
-        # 初始化元数据
+        # 7. 初始化元数据
         self.metadata = self._load_metadata()
 
-        # ID映射（Faiss内部ID到自定义ID）
+        # 8. ID映射（Faiss内部ID到自定义ID）
         self.id_mapping = {}  # {faiss_id: custom_id}
         self.reverse_id_mapping = {}  # {custom_id: faiss_id}
 
-        # 如果索引中有数据，重建ID映射
+        # 9. 如果索引中有数据，重建ID映射
         if hasattr(self.index, 'ntotal') and self.index.ntotal > 0:
             self._rebuild_id_mapping()
-
-    def _clean_path(self, path: str) -> str:
-        """
-        清理路径中的多余空格和特殊字符
-        :param path: 原始路径
-        :return: 清理后的路径
-        """
-        # 移除路径组件之间的多余空格
-        path_parts = path.split(os.sep)
-        clean_parts = [part.strip() for part in path_parts]
-        # 过滤掉空的路径组件
-        clean_parts = [part for part in clean_parts if part]
-        # 重新组合路径
-        return os.sep.join(clean_parts)
 
     def _ensure_directory_exists(self):
         """
@@ -96,24 +169,6 @@ class FaissVectorStore:
             self.index_file = os.path.join(alt_path, "faiss_index.bin")
             self.metadata_file = os.path.join(alt_path, "metadata.json")
 
-    def _load_or_create_index(self):
-        """加载或创建Faiss索引"""
-        try:
-            if os.path.exists(self.index_file):
-                # 加载现有索引
-                index = faiss.read_index(self.index_file)
-                print(f"加载现有Faiss索引，包含 {index.ntotal} 个向量")
-                return index
-            else:
-                # 创建新的索引（使用内积距离，适合余弦相似度）
-                index = faiss.IndexIDMap(faiss.IndexFlatIP(self.dimension))
-                print("创建新的Faiss索引")
-                return index
-        except Exception as e:
-            print(f"加载或创建索引时出错: {str(e)}")
-            # 返回备用索引
-            return faiss.IndexIDMap(faiss.IndexFlatIP(self.dimension))
-
     def _load_metadata(self) -> List[Dict[str, Any]]:
         """加载元数据"""
         try:
@@ -126,55 +181,40 @@ class FaissVectorStore:
 
     def _save_index(self):
         """
-        保存Faiss索引 - 增强版本，确保路径正确处理
+        保存Faiss索引 - 简化版本，避免复杂路径问题
         """
         try:
-            # 再次确认目录存在
-            self._ensure_directory_exists()
+            # 首先尝试使用当前目录下的简单文件名，完全避免路径问题
+            simple_path = "faiss_index.bin"
+            print(f"\n尝试保存到简单路径: {simple_path}")
             
-            # 修复路径中的空格问题
-            safe_index_file = self.index_file.replace(' ', '_')
-            print(f"\n使用修复后的路径写入索引: {safe_index_file}")
+            try:
+                # 直接保存到当前目录
+                faiss.write_index(self.index, simple_path)
+                print(f"成功保存Faiss索引到简单路径: {simple_path}")
+                self.index_file = simple_path
+                return
+            except Exception as e1:
+                print(f"简单路径保存失败: {str(e1)}")
             
-            # 特殊处理：先创建一个空文件，验证路径可写
-            with open(safe_index_file, 'wb') as f:
-                f.write(b'')
+            # 如果简单路径失败，尝试使用固定路径
+            fixed_path = "C:\\faiss_index.bin"
+            print(f"尝试保存到固定路径: {fixed_path}")
             
-            # Windows路径特殊处理
-            if platform.system() == 'Windows':
-                # 对于Windows，使用try/except模式尝试不同的路径处理
-                try:
-                    # 方法1：直接使用修复后的路径
-                    faiss.write_index(self.index, safe_index_file)
-                    print(f"成功保存Faiss索引到修复路径: {safe_index_file}")
-                    # 如果成功，确保我们的原始索引文件路径指向正确的文件
-                    self.index_file = safe_index_file
-                except Exception as e1:
-                    print(f"方法1失败，尝试方法2: {str(e1)}")
-                    # 方法2：使用临时文件然后复制
-                    temp_path = os.path.join(os.getcwd(), "temp_faiss_index.bin")
-                    faiss.write_index(self.index, temp_path)
-                    # 复制文件到目标位置
-                    import shutil
-                    shutil.copy2(temp_path, safe_index_file)
-                    os.remove(temp_path)  # 删除临时文件
-                    self.index_file = safe_index_file
-                    print(f"成功通过临时文件方法保存索引到: {safe_index_file}")
-            else:
-                # Linux/Mac使用标准方法
-                faiss.write_index(self.index, safe_index_file)
-                self.index_file = safe_index_file
-                
-            print(f"成功保存Faiss索引到: {self.index_file}")
+            try:
+                faiss.write_index(self.index, fixed_path)
+                print(f"成功保存Faiss索引到固定路径: {fixed_path}")
+                self.index_file = fixed_path
+                return
+            except Exception as e2:
+                print(f"固定路径保存失败: {str(e2)}")
+            
+            # 如果所有方法都失败，使用内存索引
+            print("警告：所有保存尝试都失败，索引将只保存在内存中")
+            
         except Exception as e:
             print(f"保存索引时出错: {str(e)}")
-            # 尝试保存到当前目录作为备份
-            backup_path = os.path.join(os.getcwd(), "faiss_index_backup.bin")
-            try:
-                faiss.write_index(self.index, backup_path)
-                print(f"已保存索引到备份路径: {backup_path}")
-            except:
-                print("备份索引也失败")
+            print("警告：所有保存尝试都失败，索引将只保存在内存中")
 
     def _save_metadata(self):
         """保存元数据"""
@@ -360,4 +400,24 @@ def load_faiss_store(dimension: int = 128) -> FaissVectorStore:
     :return: FaissVectorStore实例
     """
     return FaissVectorStore(dimension=dimension)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

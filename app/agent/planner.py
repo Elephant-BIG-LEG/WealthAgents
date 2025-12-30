@@ -51,19 +51,29 @@ class Planner:
             'general_query': ['查询', '什么', '如何', '是否', '为什么', '解释', '含义']
         }
 
-    def create_plan(self, user_query: str, context: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def create_plan(self, user_query: str, context: List[Dict[str, Any]], planning_context: Dict[str, Any] = None) -> List[Dict[str, Any]]:
         """
         增强版任务规划方法，支持多轮对话、知识库匹配和智能任务类型识别
+        新增: 支持从planning_context中获取之前的反思结果和调整建议
 
         Args:
             user_query: 用户查询
             context: 上下文历史列表，包含之前的对话记录
+            planning_context: 规划上下文，包含之前的反思结果和调整建议
 
         Returns:
             任务计划列表，适配LangGraphAgent的调用方式
         """
         # 初始化返回的计划列表
         plan = []
+        
+        # 如果没有提供planning_context，初始化一个空字典
+        if planning_context is None:
+            planning_context = {
+                "user_request": user_query,
+                "previous_reflections": [],
+                "adjustment_suggestions": []
+            }
 
         # 分析任务类型和对话阶段
         task_type = self._analyze_task_type(user_query, context)
@@ -73,6 +83,21 @@ class Planner:
 
         # 获取推荐的工具列表
         recommended_tools = self._get_available_tools(task_type)
+        
+        # 检查是否有调整建议，根据建议优化推荐工具
+        adjustment_suggestions = planning_context.get("adjustment_suggestions", [])
+        if adjustment_suggestions:
+            print(f"应用调整建议: {adjustment_suggestions}")
+            # 根据调整建议过滤或优先选择工具
+            for suggestion in adjustment_suggestions:
+                if '工具' in suggestion:
+                    # 如果建议提到了特定工具，确保该工具在推荐列表中
+                    for tool in recommended_tools:
+                        if tool in suggestion:
+                            # 将提到的工具移到列表首位
+                            recommended_tools.remove(tool)
+                            recommended_tools.insert(0, tool)
+                            break
 
         # 1. 首先尝试从知识库检索相关信息
         knowledge_base_results = self._retrieve_from_knowledge_base(user_query)
@@ -117,14 +142,14 @@ class Planner:
                     })
             else:
                 # 知识库没有相关信息，使用网络搜索或数据库查询
-                if task_type in ['data_collection', 'market_research'] and 'web_scraping' in recommended_tools:
+                if task_type in ['data_collection', 'market_research'] and 'web_scraping_tool' in recommended_tools:
                     task_id = f"task_{self.task_counter}"
                     self.task_counter += 1
                     plan.append({
                         "id": task_id,
                         "name": "网络数据采集",
                         "description": f"从网络采集关于{user_query}的数据",
-                        "tool_name": "web_scraping",
+                        "tool_name": "web_scraping_tool",
                         "parameters": {
                             "query": user_query,
                             "search_type": task_type
@@ -302,6 +327,12 @@ class Planner:
                 if keyword in query_lower:
                     scores[task_type] += 1
 
+        # 特殊处理：如果查询同时包含"市场"和"热点"，优先考虑market_research或news_analysis
+        if '市场' in query_lower and '热点' in query_lower:
+            # 市场热点分析应该优先进行网络数据采集
+            if scores['market_research'] > 0 or scores['news_analysis'] > 0:
+                return 'market_research' if scores['market_research'] >= scores['news_analysis'] else 'news_analysis'
+
         # 考虑上下文历史中的任务类型连贯性
         if context:
             for msg in reversed(context[-3:]):  # 查看最近3条消息
@@ -311,31 +342,42 @@ class Planner:
         # 返回得分最高的任务类型
         return max(scores, key=scores.get)
 
-    def _retrieve_from_knowledge_base(self, query: str, top_k: int = 3) -> List[Tuple[str, float, Dict]]:
+    def _retrieve_from_knowledge_base(self, query: str, top_k: int = 5) -> List[Tuple[str, float, Dict[str, Any]]]:
         """
-        从知识库中检索相关信息
-
+        从知识库检索相关信息
+        
         Args:
             query: 查询文本
             top_k: 返回最相关的k条结果
-
+        
         Returns:
             (文本, 相似度, 元数据)元组列表
         """
         if not self.vector_store or self.vector_store.get_vector_count() == 0:
+            print(f"知识库检索失败：向量存储不存在或为空")
             return []
 
         try:
             # 向量化查询文本
+            print(f"正在向量化查询文本: {query}")
             query_vector = self.vectorizer.vectorize_text(query)
+            print(f"查询向量生成成功，维度: {len(query_vector)}")
+            
             # 从知识库检索
+            print(f"正在从知识库检索，top_k={top_k}")
             results = self.vector_store.search_similar(query_vector, top_k)
+            print(f"原始检索结果: {results}")
+            
             # 降低相似度阈值，提高检索成功率
             filtered_results = [(text, sim, meta)
                                 for text, sim, meta in results if sim > 0.1]
+            print(f"过滤后结果（相似度>0.1）: {filtered_results}")
+            
             return filtered_results
         except Exception as e:
             print(f"知识库检索失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return []
 
     def _get_available_tools(self, task_type: str) -> List[str]:
@@ -349,11 +391,11 @@ class Planner:
             推荐工具列表
         """
         tool_mapping = {
-            'data_collection': ['web_scraping', 'database_tool'],
+            'data_collection': ['web_scraping_tool', 'database_tool'],
             'data_analysis': ['data_analysis', 'visualization_tool'],
-            'market_research': ['web_scraping', 'data_analysis', 'database_tool'],
+            'market_research': ['web_scraping_tool', 'data_analysis', 'database_tool'],
             'stock_analysis': ['stock_data_tool', 'data_analysis'],
-            'news_analysis': ['web_scraping', 'news_analysis'],
+            'news_analysis': ['web_scraping_tool', 'news_analysis'],
             'risk_assessment': ['risk_assessment', 'data_analysis'],
             'investment_advice': ['investment_advisor', 'risk_assessment'],
             'general_query': ['general_query', 'web_search']
@@ -440,14 +482,14 @@ class Planner:
         # 简化的请求分析逻辑
         if any(keyword in user_request.lower() for keyword in ['分析', '趋势', '股票', '市场']):
             # 需要先采集数据
-            if 'web_scraping' in available_tools:
+            if 'web_scraping_tool' in available_tools:
                 task_id = f"task_{self.task_counter}"
                 self.task_counter += 1
                 tasks.append(Task(
                     id=task_id,
                     name="数据采集",
                     description="从财经网站采集相关数据",
-                    tool_name="web_scraping",
+                    tool_name="web_scraping_tool",
                     parameters={"query": self._extract_query(user_request)},
                     dependencies=[]
                 ))
@@ -549,3 +591,11 @@ class Planner:
         # 如果没有，生成一个新的会话ID
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         return f"session_{timestamp}_{hash(str(context)) % 10000}"
+
+
+
+
+
+
+
+

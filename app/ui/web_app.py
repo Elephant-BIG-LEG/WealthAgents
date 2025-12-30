@@ -18,7 +18,7 @@ import os
 import sys
 import traceback
 import datetime
-
+import time
 from flask import Flask, render_template, request, jsonify, send_from_directory
 import os
 import logging
@@ -197,12 +197,12 @@ def agent_chat():
         # 解析请求参数
         if request.is_json:
             data = request.get_json()
-            logger.info(f"JSON请求 - query: {data.get('query')}")
-            user_query = data.get('query')
+            logger.info(f"JSON请求 - message: {data.get('message')}")
+            user_query = data.get('message')
         else:
             # 处理表单数据
-            user_query = request.form.get('query')
-            logger.info(f"表单请求 - query: {user_query}")
+            user_query = request.form.get('message')
+            logger.info(f"表单请求 - message: {user_query}")
 
         # 验证必要参数
         if not user_query:
@@ -216,7 +216,7 @@ def agent_chat():
         logger.info(f"调用Agent处理查询: {user_query}")
 
         # 使用全局Agent实例处理查询
-        response = agent.process_query(user_query)
+        response = agent.chat(user_query)
 
         # 构建返回结果
         result = {
@@ -224,12 +224,17 @@ def agent_chat():
             'message': '查询成功',
             'data': {
                 'query': user_query,
-                'response': response
-            }
+                'response': response.get('response', ''),  # 提取response字段作为AI回答
+                'session_id': response.get('session_id', ''),
+                'timestamp': response.get('timestamp', time.time())
+            },
+            'session_id': response.get('session_id', ''),  # 兼容前端可能直接使用的session_id
+            'response': response.get('response', ''),  # 直接在顶层返回AI回答，确保前端能正确获取
+            'detailed_result': response.get('detailed_result', {})  # 添加详细结果，以便前端在需要时使用
         }
 
         # 记录响应
-        logger.info(f"Agent响应: {response[:50]}...")
+        logger.info(f"Agent响应: {response.get('response', '')[:50] if response.get('response') else '无响应内容'}...")
 
         return jsonify(result)
     except Exception as e:
@@ -638,5 +643,7 @@ def clear_data():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
+
+
 
 
