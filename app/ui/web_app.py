@@ -29,6 +29,9 @@ sys.path.append(os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))))
 
 # 导入数据处理和总结的工具类
+# 初始化数据处理和总结的工具实例
+parser_helper = LangChainHelperWithIntegration()
+summarizer_helper = LangChainHelperWithSummary()
 
 # 创建Flask应用，明确指定模板目录
 # 获取当前文件的目录
@@ -483,6 +486,25 @@ def collect_data():
                 conn.commit()
 
                 logger.info(f"数据已成功写入数据库，ID: {cursor.lastrowid}")
+                
+                # Step 6: 向量化并存储到Faiss向量数据库
+                logger.info("开始将数据向量化并存储到Faiss向量数据库...")
+                from app.Embedding.Vectorization import TextVectorizer
+                from app.store.faiss_store import FaissVectorStore
+                
+                # 创建向量化器和向量存储实例
+                vectorizer = TextVectorizer()
+                vector_store = FaissVectorStore(dimension=128)
+                
+                # 准备要向量化的文本内容
+                text_content = f"{new_data_item['topic']}\n{new_data_item['market_trend']}\n{new_data_item['investment_advice']}\n{new_data_item['hotspot_summary']}"
+                
+                # 向量化文本
+                vectors = [vectorizer.vectorize_text(text_content)]
+                
+                # 存储向量
+                vector_store.add_vectors([text_content], vectors, source=source_name)
+                logger.info("数据已成功存储到Faiss向量数据库")
 
             except Exception as e:
                 conn.rollback()
@@ -616,3 +638,5 @@ def clear_data():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
+
+
