@@ -141,6 +141,42 @@
     </div>
 </div>
 
+<!-- 编辑公司模态框 -->
+<div class="modal fade" id="edit-company-modal" tabindex="-1" aria-labelledby="edit-company-modal-label"
+    aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="edit-company-modal-label">编辑公司</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="edit-company-name" class="form-label">公司名称</label>
+                    <input type="text" class="form-control" id="edit-company-name" placeholder="请输入公司名称">
+                </div>
+                <div class="mb-3">
+                    <label for="edit-company-code" class="form-label">股票代码</label>
+                    <input type="text" class="form-control" id="edit-company-code" placeholder="请输入股票代码">
+                </div>
+                <div class="mb-3">
+                    <label for="edit-company-industry" class="form-label">所属行业</label>
+                    <input type="text" class="form-control" id="edit-company-industry" placeholder="请输入所属行业">
+                </div>
+                <div class="mb-3">
+                    <label for="edit-company-description" class="form-label">公司简介</label>
+                    <textarea class="form-control" id="edit-company-description" rows="3"
+                        placeholder="请输入公司简介"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="save-edit-company-btn">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- 公司详情模态框 -->
 <div class="modal fade" id="company-detail-modal" tabindex="-1" aria-labelledby="company-detail-modal-label"
     aria-hidden="true">
@@ -209,56 +245,98 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // 模拟数据
-        const mockCompanies = [
-            { id: 1, name: '阿里巴巴', code: 'BABA', industry: '科技', description: '中国领先的电商巨头' },
-            { id: 2, name: '腾讯控股', code: '0700.HK', industry: '科技', description: '中国领先的互联网科技公司' },
-            { id: 3, name: '贵州茅台', code: '600519.SH', industry: '食品饮料', description: '中国著名的白酒企业' }
-        ];
+        // 移除模拟数据，改为从API获取
+        let companies = [];
 
         // 渲染公司列表
         const companyList = document.getElementById('company-list');
         const selectedCompanySelect = document.getElementById('selected-company');
         const queryCompanySelect = document.getElementById('query-company');
 
-        function renderCompanyList(companies) {
+        // 从API获取公司列表
+        function fetchCompanies() {
+            fetch('/api/company/list')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 200) {
+                        companies = data.data.companies;
+                        renderCompanyList(companies);
+                    }
+                })
+                .catch(error => {
+                    console.error('获取公司列表失败:', error);
+                    showMessage('获取公司列表失败', 'danger');
+                });
+        }
+
+        function renderCompanyList(companiesToRender) {
             companyList.innerHTML = '';
             selectedCompanySelect.innerHTML = '<option value="">请先选择公司</option>';
             queryCompanySelect.innerHTML = '<option value="">请先选择公司</option>';
 
-            companies.forEach(company => {
+            companiesToRender.forEach(company => {
                 // 添加到公司列表
                 const item = document.createElement('a');
                 item.href = '#';
-                item.className = 'list-group-item list-group-item-action';
+                item.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
                 item.innerHTML = `
-                    <div class="d-flex w-100 justify-content-between">
-                        <h5 class="mb-1">${company.name}</h5>
-                        <small>${company.code}</small>
+                    <div>
+                        <div class="d-flex w-100 justify-content-between">
+                            <h5 class="mb-1">${company.company_name}</h5>
+                            <small>${company.stock_code || '无'}</small>
+                        </div>
+                        <p class="mb-1">${company.industry || '未分类'}</p>
+                        <small>${(company.english_name || '').substring(0, 30)}...</small>
                     </div>
-                    <p class="mb-1">${company.industry}</p>
-                    <small>${company.description.substring(0, 30)}...</small>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-sm btn-primary edit-company-btn" data-id="${company.id}">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-danger delete-company-btn" data-id="${company.id}" data-name="${company.company_name}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 `;
                 item.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    selectCompany(company);
+                    if (!e.target.closest('.btn-group')) {
+                        e.preventDefault();
+                        selectCompany(company);
+                    }
                 });
                 companyList.appendChild(item);
 
                 // 添加到下拉菜单
                 const option1 = document.createElement('option');
                 option1.value = company.id;
-                option1.textContent = `${company.name} (${company.code})`;
+                option1.textContent = `${company.company_name} (${company.stock_code || '无'})`;
                 selectedCompanySelect.appendChild(option1);
 
                 const option2 = document.createElement('option');
                 option2.value = company.id;
-                option2.textContent = `${company.name} (${company.code})`;
+                option2.textContent = `${company.company_name} (${company.stock_code || '无'})`;
                 queryCompanySelect.appendChild(option2);
             });
 
+            // 绑定修改和删除事件
+            document.querySelectorAll('.edit-company-btn').forEach(btn => {
+                btn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    const companyId = parseInt(this.getAttribute('data-id'));
+                    editCompany(companyId);
+                });
+            });
+
+            document.querySelectorAll('.delete-company-btn').forEach(btn => {
+                btn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    const companyId = parseInt(this.getAttribute('data-id'));
+                    const companyName = this.getAttribute('data-name');
+                    deleteCompany(companyId, companyName);
+                });
+            });
+
             // 启用下拉菜单
-            if (companies.length > 0) {
+            if (companiesToRender.length > 0) {
                 selectedCompanySelect.disabled = false;
                 queryCompanySelect.disabled = false;
             }
@@ -279,10 +357,11 @@
         // 搜索公司
         document.getElementById('search-btn').addEventListener('click', function () {
             const searchTerm = document.getElementById('company-search').value.toLowerCase();
-            const filtered = mockCompanies.filter(company =>
-                company.name.toLowerCase().includes(searchTerm) ||
-                company.code.toLowerCase().includes(searchTerm) ||
-                company.industry.toLowerCase().includes(searchTerm)
+            const filtered = companies.filter(company =>
+                (company.company_name || '').toLowerCase().includes(searchTerm) ||
+                (company.stock_code || '').toLowerCase().includes(searchTerm) ||
+                (company.industry || '').toLowerCase().includes(searchTerm) ||
+                (company.english_name || '').toLowerCase().includes(searchTerm)
             );
             renderCompanyList(filtered);
         });
@@ -295,168 +374,131 @@
 
         // 保存公司
         document.getElementById('save-company-btn').addEventListener('click', function () {
-            const name = document.getElementById('company-name').value;
-            const code = document.getElementById('company-code').value;
+            const companyName = document.getElementById('company-name').value;
+            const stockCode = document.getElementById('company-code').value;
             const industry = document.getElementById('company-industry').value;
-            const description = document.getElementById('company-description').value;
+            const englishName = document.getElementById('company-description').value; // 原description字段用于english_name
 
-            if (name && code) {
-                // 在实际应用中，这里会发送API请求保存公司
-                mockCompanies.push({
-                    id: mockCompanies.length + 1,
-                    name,
-                    code,
-                    industry,
-                    description
-                });
-
-                renderCompanyList(mockCompanies);
-
-                // 清空表单
-                document.getElementById('company-name').value = '';
-                document.getElementById('company-code').value = '';
-                document.getElementById('company-industry').value = '';
-                document.getElementById('company-description').value = '';
-
-                addCompanyModal.hide();
-                showMessage('公司添加成功', 'success');
-            } else {
-                showMessage('请填写公司名称和股票代码', 'danger');
-            }
-        });
-
-        // 公司详情模态框
-        const companyDetailModal = new bootstrap.Modal(document.getElementById('company-detail-modal'));
-        companyList.addEventListener('dblclick', function (e) {
-            if (currentCompany) {
-                document.getElementById('detail-company-name').textContent = currentCompany.name;
-                document.getElementById('detail-company-code').textContent = currentCompany.code;
-                document.getElementById('detail-company-industry').textContent = currentCompany.industry;
-                document.getElementById('detail-company-description').textContent = currentCompany.description;
-                document.getElementById('detail-document-count').textContent = '5';
-                document.getElementById('detail-chunk-count').textContent = '42';
-                document.getElementById('detail-last-update').textContent = new Date().toLocaleDateString();
-
-                // 模拟文档列表
-                const documentList = document.getElementById('detail-document-list');
-                documentList.innerHTML = '';
-                for (let i = 1; i <= 5; i++) {
-                    const item = document.createElement('div');
-                    item.className = 'list-group-item';
-                    item.innerHTML = `
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">${currentCompany.name}2023年${i}季度报告</h6>
-                            <span class="badge bg-primary">季报</span>
-                        </div>
-                        <small>上传时间: 2023-10-${10 + i}</small>
-                    `;
-                    documentList.appendChild(item);
-                }
-
-                companyDetailModal.show();
-            }
-        });
-
-        // 上传文档
-        const uploadProgressModal = new bootstrap.Modal(document.getElementById('upload-progress-modal'));
-        document.getElementById('upload-btn').addEventListener('click', function () {
-            const files = document.getElementById('document-upload').files;
-            const companyId = selectedCompanySelect.value;
-            const documentType = document.getElementById('document-type').value;
-
-            if (files.length > 0 && currentCompany) {
-                uploadProgressModal.show();
-
-                // 创建FormData对象
-                const formData = new FormData();
-                formData.append('company_name', currentCompany.name);
-
-                for (let i = 0; i < files.length; i++) {
-                    formData.append('documents', files[i]);
-                }
-
-                // 更新进度条
-                const progressBar = document.getElementById('upload-progress-bar');
-                const progressText = document.getElementById('upload-progress-text');
-
-                // 模拟上传进度
-                let progress = 0;
-                const interval = setInterval(() => {
-                    progress += 5;
-                    progressBar.style.width = `${progress}%`;
-                    progressBar.setAttribute('aria-valuenow', progress);
-                    progressText.textContent = `上传中... ${progress}%`;
-
-                    if (progress >= 90) {
-                        clearInterval(interval);
-                    }
-                }, 200);
-
-                // 发送上传请求
-                fetch('/api/company/knowledge/upload', {
+            if (companyName) {
+                // 调用API保存公司
+                fetch('/api/company/add', {
                     method: 'POST',
-                    body: formData
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        company_name: companyName,
+                        stock_code: stockCode,
+                        industry: industry,
+                        english_name: englishName
+                    })
                 })
                     .then(response => response.json())
                     .then(data => {
-                        clearInterval(interval);
-                        progressBar.style.width = '100%';
-                        progressBar.setAttribute('aria-valuenow', 100);
-                        progressText.textContent = '处理完成';
+                        if (data.code === 200) {
+                            // 刷新公司列表
+                            fetchCompanies();
 
-                        setTimeout(() => {
-                            uploadProgressModal.hide();
-                            if (data.code === 200) {
-                                showMessage(data.message || '文档上传和处理成功', 'success');
-                                document.getElementById('document-upload').value = '';
-                            } else {
-                                showMessage(data.message || '文档上传失败', 'danger');
-                            }
-                        }, 500);
+                            // 清空表单
+                            document.getElementById('company-name').value = '';
+                            document.getElementById('company-code').value = '';
+                            document.getElementById('company-industry').value = '';
+                            document.getElementById('company-description').value = '';
+
+                            addCompanyModal.hide();
+                            showMessage('公司添加成功', 'success');
+                        } else {
+                            showMessage(data.message || '添加公司失败', 'danger');
+                        }
                     })
                     .catch(error => {
-                        clearInterval(interval);
-                        uploadProgressModal.hide();
-                        showMessage('上传过程中发生错误: ' + error.message, 'danger');
+                        console.error('添加公司失败:', error);
+                        showMessage('添加公司失败', 'danger');
                     });
-            } else {
-                showMessage('请选择文件', 'danger');
             }
         });
 
-        // 查询知识库
-        document.getElementById('query-btn').addEventListener('click', function () {
-            const query = document.getElementById('query-input').value;
-            if (query && currentCompany) {
-                const resultsContainer = document.getElementById('query-results');
-                const resultContent = document.getElementById('result-content');
-                const relatedDocuments = document.getElementById('related-documents');
+        // 修改公司功能
+        const editCompanyModal = new bootstrap.Modal(document.getElementById('edit-company-modal'));
+        let currentEditingCompany = null;
 
-                resultsContainer.style.display = 'block';
+        function editCompany(companyId) {
+            const company = companies.find(c => c.id === companyId);
+            if (company) {
+                currentEditingCompany = company;
+                document.getElementById('edit-company-name').value = company.company_name;
+                document.getElementById('edit-company-code').value = company.stock_code || '';
+                document.getElementById('edit-company-industry').value = company.industry || '';
+                document.getElementById('edit-company-description').value = company.english_name || '';
+                editCompanyModal.show();
+            }
+        }
 
-                // 模拟查询结果
-                resultContent.textContent = `根据${currentCompany.name}的知识库，${query}相关信息如下...`;
+        document.getElementById('save-edit-company-btn').addEventListener('click', function () {
+            if (!currentEditingCompany) return;
 
-                // 模拟相关文档
-                relatedDocuments.innerHTML = '';
-                for (let i = 1; i <= 3; i++) {
-                    const item = document.createElement('li');
-                    item.className = 'list-group-item';
-                    item.innerHTML = `
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span>${currentCompany.name}2023年报告 - 第${i}部分</span>
-                            <small class="text-muted">相关性: ${90 - i * 10}%</small>
-                        </div>
-                    `;
-                    relatedDocuments.appendChild(item);
-                }
-            } else {
-                showMessage('请输入查询问题', 'danger');
+            const companyName = document.getElementById('edit-company-name').value;
+            const stockCode = document.getElementById('edit-company-code').value;
+            const industry = document.getElementById('edit-company-industry').value;
+            const englishName = document.getElementById('edit-company-description').value;
+
+            if (companyName) {
+                // 调用API更新公司
+                fetch(`/api/company/update/${currentEditingCompany.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        company_name: companyName,
+                        stock_code: stockCode,
+                        industry: industry,
+                        english_name: englishName
+                    })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.code === 200) {
+                            // 刷新公司列表
+                            fetchCompanies();
+                            editCompanyModal.hide();
+                            showMessage('公司更新成功', 'success');
+                        } else {
+                            showMessage(data.message || '更新公司失败', 'danger');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('更新公司失败:', error);
+                        showMessage('更新公司失败', 'danger');
+                    });
             }
         });
 
-        // 初始化渲染
-        renderCompanyList(mockCompanies);
+        // 删除公司功能
+        function deleteCompany(companyId, companyName) {
+            if (confirm(`确定要删除公司 "${companyName}" 吗？此操作不可恢复。`)) {
+                fetch(`/api/company/delete/${companyId}`, {
+                    method: 'DELETE'
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.code === 200) {
+                            // 刷新公司列表
+                            fetchCompanies();
+                            showMessage('公司删除成功', 'success');
+                        } else {
+                            showMessage(data.message || '删除公司失败', 'danger');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('删除公司失败:', error);
+                        showMessage('删除公司失败', 'danger');
+                    });
+            }
+        }
+
+        // 初始化页面
+        fetchCompanies();
     });
 </script>
 {% endblock %}

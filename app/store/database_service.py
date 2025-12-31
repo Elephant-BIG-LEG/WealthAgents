@@ -35,7 +35,8 @@ class DatabaseConnection:
                 password=self.password,
                 database=self.database,
                 port=self.port,
-                auth_plugin='mysql_native_password'
+                auth_plugin='mysql_native_password',
+                charset=DB_CONFIG['charset']
             )
 
             if self.connection.is_connected():
@@ -101,3 +102,4 @@ def get_database_service() -> DatabaseConnection:
         DatabaseConnection实例
     """
     return get_database_connection()
+

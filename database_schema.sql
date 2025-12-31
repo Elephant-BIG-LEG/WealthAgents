@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS RecentHotTopics (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='近期财经热点数据表';
 
 -- 为source字段也创建索引，优化按来源查询
-CREATE INDEX IF NOT EXISTS idx_source ON RecentHotTopics(source);
+CREATE INDEX idx_source ON RecentHotTopics(source);
 
 -- 为topic字段创建全文索引，支持主题关键词搜索
 ALTER TABLE RecentHotTopics ADD FULLTEXT INDEX ft_idx_topic(topic);
@@ -50,3 +50,44 @@ ALTER TABLE ConversationHistory ADD FULLTEXT INDEX ft_idx_content(content);
 
 -- 为task_type字段创建索引，优化任务类型查询
 CREATE INDEX idx_task_type ON ConversationHistory(task_type);
+
+
+
+-- 创建Company表，存储公司基本信息
+CREATE TABLE IF NOT EXISTS Company (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键',
+    company_name VARCHAR(255) NOT NULL COMMENT '公司名称',
+    english_name VARCHAR(255) DEFAULT NULL COMMENT '公司英文名',
+    stock_code VARCHAR(20) DEFAULT NULL COMMENT '股票代码',
+    industry VARCHAR(100) DEFAULT NULL COMMENT '所属行业',
+    founded_year INT DEFAULT NULL COMMENT '成立年份',
+    headquarters VARCHAR(255) DEFAULT NULL COMMENT '总部地点',
+    website VARCHAR(255) DEFAULT NULL COMMENT '公司官网',
+    knowledge_base_path VARCHAR(500) NOT NULL COMMENT '知识库存储路径',
+    document_count INT UNSIGNED DEFAULT 0 COMMENT '文档数量',
+    chunk_count INT UNSIGNED DEFAULT 0 COMMENT '文本块数量',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '创建时间',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL COMMENT '更新时间',
+    UNIQUE KEY uk_company_name (company_name) COMMENT '确保公司名称唯一',
+    INDEX idx_industry (industry) COMMENT '行业索引',
+    INDEX idx_stock_code (stock_code) COMMENT '股票代码索引'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='公司基本信息表';
+
+-- 创建CompanyVersion表，存储公司知识库版本历史
+CREATE TABLE IF NOT EXISTS CompanyVersion (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键',
+    company_id BIGINT UNSIGNED NOT NULL COMMENT '关联的公司ID',
+    document_count INT UNSIGNED NOT NULL COMMENT '文档数量',
+    chunk_count INT UNSIGNED NOT NULL COMMENT '文本块数量',
+    version_note TEXT DEFAULT NULL COMMENT '版本说明',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '版本创建时间',
+
+    INDEX idx_company_id (company_id),
+    CONSTRAINT fk_company_version_company
+        FOREIGN KEY (company_id)
+        REFERENCES Company(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB
+DEFAULT CHARSET=utf8mb4
+COLLATE=utf8mb4_unicode_ci
+COMMENT='公司知识库版本历史表';

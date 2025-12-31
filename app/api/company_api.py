@@ -5,10 +5,12 @@ from datetime import datetime
 from typing import Dict, Any
 
 # 导入我们创建的服务
+
 try:
     from app.services.company_knowledge_manager import knowledge_manager
     from app.services.document_processor import document_processor, file_upload_handler
     from app.services.financial_analyzer import financial_analyzer
+    from app.services.company_service import company_service
     from app.utils.response_utils import success_response, error_response
     from app.utils.auth_utils import require_auth
     has_dependencies = True
@@ -197,6 +199,159 @@ def query_company_knowledge():
     except Exception as e:
         logger.error(f"查询公司知识库时出错: {str(e)}")
         return error_response(f"查询失败: {str(e)}")
+
+
+@company_api.route('/list', methods=['GET'])
+def get_company_list():
+    """
+    获取所有公司列表
+    ---
+    tags:
+      - Company Management
+    responses:
+      200:
+        description: 获取成功
+    """
+    try:
+        # 检查依赖是否加载成功
+        if not has_dependencies:
+            return error_response("系统依赖加载失败，请检查服务配置")
+        
+        # 从company_service获取所有公司列表
+        companies = company_service.get_all_companies()
+        
+        return success_response(
+            message="获取成功",
+            data={"companies": companies}
+        )
+        
+    except Exception as e:
+        logger.error(f"获取公司列表时出错: {str(e)}")
+        return error_response(f"获取失败: {str(e)}")
+
+@company_api.route('/delete/<int:company_id>', methods=['DELETE'])
+def delete_company(company_id):
+    """
+    删除公司
+    ---
+    tags:
+      - Company Management
+    parameters:
+      - in: path
+        name: company_id
+        type: integer
+        required: true
+        description: 公司ID
+    responses:
+      200:
+        description: 删除成功
+      404:
+        description: 公司不存在
+    """
+    try:
+        # 检查依赖是否加载成功
+        if not has_dependencies:
+            return error_response("系统依赖加载失败，请检查服务配置")
+        
+        # 从company_service删除公司
+        success = company_service.delete_company(company_id)
+        
+        if success:
+            return success_response(message=f"公司已成功删除")
+        else:
+            return error_response(f"公司不存在", status_code=404)
+            
+    except Exception as e:
+        logger.error(f"删除公司时出错: {str(e)}")
+        return error_response(f"删除失败: {str(e)}")
+
+
+@company_api.route('/add', methods=['POST'])
+def add_company():
+    """
+    添加新公司
+    ---
+    tags:
+      - Company Management
+    parameters:
+      - in: body
+        name: request
+        schema:
+          type: object
+          required:
+            - company_name
+          properties:
+            company_name:
+              type: string
+              description: 公司名称
+            english_name:
+              type: string
+              description: 公司英文名称
+            stock_code:
+              type: string
+              description: 股票代码
+            industry:
+              type: string
+              description: 行业
+            founded_year:
+              type: integer
+              description: 成立年份
+            headquarters:
+              type: string
+              description: 总部所在地
+            website:
+              type: string
+              description: 公司网站
+    responses:
+      200:
+        description: 添加成功
+      400:
+        description: 请求参数错误
+    """
+    try:
+        # 检查依赖是否加载成功
+        if not has_dependencies:
+            return error_response("系统依赖加载失败，请检查服务配置")
+        
+        # 获取请求数据
+        data = request.get_json()
+        if not data or 'company_name' not in data:
+            return error_response("缺少必要的请求参数")
+        
+        company_name = data.get('company_name')
+        if not company_name.strip():
+            return error_response("公司名称不能为空")
+        
+        # 获取其他可选参数
+        kwargs = {
+            'english_name': data.get('english_name'),
+            'stock_code': data.get('stock_code'),
+            'industry': data.get('industry'),
+            'founded_year': data.get('founded_year'),
+            'headquarters': data.get('headquarters'),
+            'website': data.get('website')
+        }
+        
+        # 过滤掉None值
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        
+        # 添加公司
+        company_id = company_service.add_company(company_name, **kwargs)
+        
+        if company_id:
+            return success_response(
+                message=f"公司 {company_name} 添加成功",
+                data={
+                    'company_id': company_id,
+                    'company_name': company_name
+                }
+            )
+        else:
+            return error_response(f"添加公司 {company_name} 失败")
+            
+    except Exception as e:
+        logger.error(f"添加公司时出错: {str(e)}")
+        return error_response(f"添加失败: {str(e)}")
 
 
 @company_api.route('/knowledge/list', methods=['GET'])
@@ -451,6 +606,8 @@ def require_auth(func):
     return wrapper
 
 
+# 修复重复定义的问题，删除多余的delete_company_knowledge函数
+
 # 注册API蓝图的函数
 def register_company_api(app):
     """
@@ -458,3 +615,58 @@ def register_company_api(app):
     """
     app.register_blueprint(company_api)
     logger.info("公司API蓝图注册成功")
+
+
+
+@company_api.route('/update/<int:company_id>', methods=['PUT'])
+def update_company(company_id):
+    """更新公司信息"""
+    try:
+        data = request.get_json()
+        company_name = data.get('company_name')
+        stock_code = data.get('stock_code')
+        industry = data.get('industry')
+        english_name = data.get('english_name')
+
+        # 参数验证
+        if not company_name:
+            return jsonify({
+                'code': 400,
+                'message': '公司名称不能为空'
+            })
+
+        # 准备更新数据
+        update_data = {
+            'company_name': company_name,
+            'stock_code': stock_code,
+            'industry': industry,
+            'english_name': english_name
+        }
+        
+        # 过滤掉None值
+        update_data = {k: v for k, v in update_data.items() if v is not None}
+
+        # 更新公司信息
+        success = company_service.update_company(company_id, **update_data)
+        
+        if success:
+            return jsonify({
+                'code': 200,
+                'message': '公司信息更新成功',
+                'data': None
+            })
+        else:
+            return jsonify({
+                'code': 404,
+                'message': '公司不存在',
+                'data': None
+            })
+    except Exception as e:
+        logging.error(f"更新公司失败: {str(e)}")
+        return jsonify({
+            'code': 500,
+            'message': f'更新公司失败: {str(e)}',
+            'data': None
+        })
+
+# 文件结束，这里不应该有任何重复的函数定义
