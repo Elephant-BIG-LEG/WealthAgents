@@ -15,3 +15,7 @@ PyPDF2==3.0.1
 python-docx==0.8.11
 pandas==2.0.3
 PyJWT==2.8.0
+
+# RAG 增强版依赖
+sentence-transformers>=2.2.0  # SBERT 向量化和 Re-ranking
+jieba>=0.42.0  # 中文分词

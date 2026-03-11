@@ -295,12 +295,14 @@ class FaissVectorStore:
 
         print(f"成功添加 {len(vectors)} 条向量数据到Faiss数据库")
 
-    def search_similar(self, query_vector: np.ndarray, top_k: int = 5) -> List[Tuple[str, float, Dict]]:
+    def search_similar(self, query_vector: np.ndarray, top_k: int = 5,
+                       filters: Dict[str, Any] = None) -> List[Tuple[str, float, Dict]]:
         """
-        搜索相似向量
+        搜索相似向量（支持元数据过滤）
         :param query_vector: 查询向量
-        :param top_k: 返回最相似的前k个结果
-        :return: (文本, 相似度, 元数据) 的元组列表
+        :param top_k: 返回最相似的前 k 个结果
+        :param filters: 过滤器字典，例如 {'source': 'web_scraping', 'min_score': 0.5}
+        :return: (文本，相似度，元数据) 的元组列表
         """
         if self.index.ntotal == 0:
             return []
@@ -314,17 +316,18 @@ class FaissVectorStore:
         # 归一化查询向量
         faiss.normalize_L2(query_vector)
 
-        # 搜索相似向量
-        distances, indices = self.index.search(query_vector, top_k)
+        # 搜索相似向量（获取更多候选用于过滤）
+        filter_top_k = top_k * 3 if filters else top_k
+        distances, indices = self.index.search(query_vector, filter_top_k)
 
         # 构建结果
         results = []
         for i, (distance, faiss_id) in enumerate(zip(distances[0], indices[0])):
-            # Faiss返回-1表示没有找到足够的结果
+            # Faiss 返回 -1 表示没有找到足够的结果
             if faiss_id == -1:
                 continue
 
-            # 通过ID映射找到对应的元数据
+            # 通过 ID 映射找到对应的元数据
             if faiss_id in self.id_mapping:
                 custom_id = self.id_mapping[faiss_id]
                 if custom_id < len(self.metadata):
@@ -332,9 +335,63 @@ class FaissVectorStore:
                     text = metadata["text"]
                     # 距离是内积，转换为相似度分数
                     similarity = float(distance)
+                    
+                    # 应用过滤器
+                    if filters:
+                        if not self._apply_filters(metadata, similarity, filters):
+                            continue
+                    
                     results.append((text, similarity, metadata))
+        
+        # 如果应用了过滤器，可能需要重新排序并截取 top_k
+        if filters and len(results) > top_k:
+            results.sort(key=lambda x: x[1], reverse=True)
+            results = results[:top_k]
 
         return results
+    
+    def _apply_filters(self, metadata: Dict, similarity: float, filters: Dict[str, Any]) -> bool:
+        """
+        应用过滤器
+        :param metadata: 元数据字典
+        :param similarity: 相似度分数
+        :param filters: 过滤器字典
+        :return: 是否通过过滤
+        """
+        # 来源过滤
+        if 'source' in filters:
+            if isinstance(filters['source'], list):
+                if metadata.get('source') not in filters['source']:
+                    return False
+            else:
+                if metadata.get('source') != filters['source']:
+                    return False
+        
+        # 最小相似度过滤
+        if 'min_similarity' in filters:
+            if similarity < filters['min_similarity']:
+                return False
+        
+        # 最大相似度过滤（用于去重等场景）
+        if 'max_similarity' in filters:
+            if similarity > filters['max_similarity']:
+                return False
+        
+        # 日期范围过滤
+        if 'date_range' in filters:
+            timestamp = metadata.get('timestamp', '')
+            start_date, end_date = filters['date_range']
+            if timestamp:
+                if timestamp < start_date or timestamp > end_date:
+                    return False
+        
+        # 自定义字段过滤
+        for key, value in filters.items():
+            if key not in ['source', 'min_similarity', 'max_similarity', 'date_range']:
+                if metadata.get(key) != value:
+                    return False
+        
+        return True
 
     def get_vector_count(self) -> int:
         """获取向量总数"""

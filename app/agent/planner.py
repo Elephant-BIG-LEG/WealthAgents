@@ -342,31 +342,63 @@ class Planner:
         # 返回得分最高的任务类型
         return max(scores, key=scores.get)
 
-    def _retrieve_from_knowledge_base(self, query: str, top_k: int = 5) -> List[Tuple[str, float, Dict[str, Any]]]:
+    def _retrieve_from_knowledge_base(self, query: str, top_k: int = 5,
+                                       use_enhanced_rag: bool = True) -> List[Tuple[str, float, Dict[str, Any]]]:
         """
-        从知识库检索相关信息
+        从知识库检索相关信息（支持增强版 RAG）
         
         Args:
             query: 查询文本
-            top_k: 返回最相关的k条结果
+            top_k: 返回最相关的 k 条结果
+            use_enhanced_rag: 是否使用增强版 RAG（默认 True）
         
         Returns:
-            (文本, 相似度, 元数据)元组列表
+            (文本，相似度，元数据) 元组列表
         """
         if not self.vector_store or self.vector_store.get_vector_count() == 0:
             print(f"知识库检索失败：向量存储不存在或为空")
             return []
 
         try:
+            # 使用增强版 RAG 检索
+            if use_enhanced_rag:
+                try:
+                    from app.retrieval.enhanced_rag_retriever import EnhancedRAGRetriever
+                    
+                    # 创建增强版 RAG 检索器
+                    rag_retriever = EnhancedRAGRetriever(
+                        vector_store=self.vector_store,
+                        enable_hybrid=True,  # 启用混合检索
+                        enable_rerank=False,  # 暂时不启用 Re-ranking（需要额外依赖）
+                        enable_query_rewrite=True  # 启用查询改写
+                    )
+                    
+                    # 执行检索
+                    results = rag_retriever.retrieve(
+                        query=query,
+                        top_k=top_k,
+                        return_context=False  # 返回原始结果列表
+                    )
+                    
+                    print(f"增强版 RAG 检索成功，返回 {len(results)} 条结果")
+                    return results
+                    
+                except Exception as e:
+                    print(f"增强版 RAG 检索失败：{e}，回退到基础版本")
+                    import traceback
+                    traceback.print_exc()
+            
+            # 回退到基础版检索
+            print(f"使用基础版检索方法")
             # 向量化查询文本
-            print(f"正在向量化查询文本: {query}")
+            print(f"正在向量化查询文本：{query}")
             query_vector = self.vectorizer.vectorize_text(query)
-            print(f"查询向量生成成功，维度: {len(query_vector)}")
+            print(f"查询向量生成成功，维度：{len(query_vector)}")
             
             # 从知识库检索
             print(f"正在从知识库检索，top_k={top_k}")
             results = self.vector_store.search_similar(query_vector, top_k)
-            print(f"原始检索结果: {results}")
+            print(f"原始检索结果：{results}")
             
             # 降低相似度阈值，提高检索成功率
             filtered_results = [(text, sim, meta)
@@ -375,7 +407,7 @@ class Planner:
             
             return filtered_results
         except Exception as e:
-            print(f"知识库检索失败: {str(e)}")
+            print(f"知识库检索失败：{str(e)}")
             import traceback
             traceback.print_exc()
             return []
