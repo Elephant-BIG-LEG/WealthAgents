@@ -78,26 +78,61 @@
             });
         });
 
+        // 绑定刷新按钮事件
+        const refreshBtn = document.getElementById('refresh-analysis');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', function () {
+                console.log('手动刷新热点数据');
+                loadHotspots();
+            });
+        }
+
+        // 检查是否从数据采集页面跳转过来
+        const fromCollection = sessionStorage.getItem('justCollectedData');
+        if (fromCollection === 'true') {
+            console.log('检测到刚从数据采集页面跳转，强制刷新数据');
+            // 清除标记
+            sessionStorage.removeItem('justCollectedData');
+        }
+
         // 初始化加载热点数据
         loadHotspots();
+
+        // 设置自动刷新（每 30 秒）
+        setInterval(loadHotspots, 30000);
     });
 
     function loadHotspots() {
         const listContainer = document.getElementById('hotspots-list');
         listContainer.innerHTML = '<div class="text-center py-5"><i class="fas fa-spinner fa-spin fa-2x mb-3"></i><p>加载中...</p></div>';
 
-        fetch('/get_data')
+        // 添加时间戳防止缓存
+        const timestamp = new Date().getTime();
+        fetch('/get_data?t=' + timestamp)
             .then(response => response.json())
             .then(data => {
+                console.log('近期热点数据:', data);
                 if (data.success && data.data) {
                     currentHotspots = data.data;
                     renderHotspotsList(data.data);
+
+                    // 显示数据数量和最后更新时间
+                    const countSpan = document.getElementById('hotspots-count');
+                    if (countSpan) {
+                        countSpan.textContent = data.data.length;
+                    }
+
+                    const updateTimeSpan = document.getElementById('update-time');
+                    if (updateTimeSpan) {
+                        updateTimeSpan.textContent = new Date().toLocaleString('zh-CN');
+                    }
                 } else {
                     listContainer.innerHTML = '<div class="text-center py-5 text-muted"><i class="fas fa-info-circle fa-2x mb-3"></i><p>暂无热点数据</p></div>';
                 }
             })
             .catch(error => {
-                listContainer.innerHTML = '<div class="text-center py-5 text-danger"><i class="fas fa-exclamation-triangle fa-2x mb-3"></i><p>加载失败: ' + error.message + '</p></div>';
+                console.error('加载热点数据失败:', error);
+                listContainer.innerHTML = '<div class="text-center py-5 text-danger"><i class="fas fa-exclamation-triangle fa-2x mb-3"></i><p>加载失败：' + error.message + '</p></div>';
             });
     }
 

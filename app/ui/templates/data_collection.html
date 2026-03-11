@@ -116,17 +116,72 @@
 
 {% block scripts %}
 <script>
+    // 全局错误处理
+    window.addEventListener('error', function (e) {
+        console.error('全局错误:', e.message);
+        console.error('错误详情:', e.error);
+        alert('页面脚本错误：' + e.message);
+    });
+
     document.addEventListener('DOMContentLoaded', function () {
+        console.log('DOM 加载完成，开始绑定事件');
+
+        // 测试：页面加载时显示欢迎消息
+        if (typeof showMessage === 'function') {
+            showMessage('数据采集页面已加载，请填写信息后点击"开始采集"按钮', 'info');
+        } else {
+            alert('数据采集页面已加载');
+        }
+
+        // 获取表单元素
+        const form = document.getElementById('collection-form');
+        const refreshBtn = document.getElementById('refresh-tasks');
+        const submitBtn = document.getElementById('start-collection-btn');
+
+        console.log('表单元素:', form);
+        console.log('刷新按钮:', refreshBtn);
+        console.log('提交按钮:', submitBtn);
+
+        if (!form) {
+            console.error('错误：找不到表单元素 #collection-form');
+            alert('页面加载失败，请刷新重试');
+            return;
+        }
+
+        if (!submitBtn) {
+            console.error('错误：找不到提交按钮 #start-collection-btn');
+            alert('页面加载失败，请刷新重试');
+            return;
+        }
+
         // 绑定事件
-        document.getElementById('collection-form').addEventListener('submit', startCollection);
-        document.getElementById('refresh-tasks').addEventListener('click', loadTasks);
+        form.addEventListener('submit', function (e) {
+            console.log('表单 submit 事件触发');
+            startCollection(e);
+        });
+
+        // 也绑定按钮的 click 事件作为备用
+        submitBtn.addEventListener('click', function (e) {
+            console.log('按钮 click 事件触发');
+            // 阻止默认行为，手动触发表单提交
+            e.preventDefault();
+            form.dispatchEvent(new Event('submit'));
+        });
+
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', loadTasks);
+        }
 
         // 初始化加载任务列表
         loadTasks();
+
+        console.log('事件绑定完成');
     });
 
     function startCollection(e) {
         e.preventDefault();
+
+        console.log('表单提交事件已触发');
 
         const sourceType = document.getElementById('source-type').value;
         const sourceName = document.getElementById('source-name').value;
@@ -134,6 +189,15 @@
         const frequency = document.getElementById('collection-frequency').value;
         const keywords = document.getElementById('keywords').value;
         const stockCodes = document.getElementById('stock-codes').value;
+
+        console.log('采集参数:', {
+            sourceType,
+            sourceName,
+            sourceUrl,
+            frequency,
+            keywords,
+            stockCodes
+        });
 
         // 验证必填字段
         if (!sourceName || !sourceUrl) {
@@ -160,24 +224,38 @@
             method: 'POST',
             body: formData
         })
-            .then(response => response.json())
+            .then(response => {
+                console.log('服务器响应:', response);
+                return response.json();
+            })
             .then(data => {
+                console.log('解析后的数据:', data);
                 if (data.success) {
                     showMessage('采集任务已启动，采集到 ' + data.data_count + ' 条数据', 'success');
-                    // 重新加载任务列表
+
+                    // 立即刷新任务列表，确保用户能看到新数据
                     loadTasks();
-                    // 跳转到分析页面
+
+                    // 设置标记，告诉下一个页面刚刚采集了数据
+                    sessionStorage.setItem('justCollectedData', 'true');
+
+                    // 等待 3 秒确保用户看到成功消息，然后跳转到近期热点页面
                     setTimeout(() => {
+                        console.log('准备跳转到近期热点页面');
                         window.location.href = '/recent-hotspots';
-                    }, 2000);
+                    }, 3000);
                 } else {
-                    showMessage('采集失败: ' + data.message, 'danger');
+                    showMessage('采集失败：' + data.message, 'danger');
+                    // 即使失败也刷新列表，可能部分数据成功了
+                    loadTasks();
                 }
             })
             .catch(error => {
-                showMessage('请求失败: ' + error.message, 'danger');
+                console.error('请求错误:', error);
+                showMessage('请求失败：' + error.message, 'danger');
             })
             .finally(() => {
+                console.log('请求完成，恢复按钮状态');
                 // 恢复按钮状态
                 btn.innerHTML = originalHtml;
                 btn.disabled = false;

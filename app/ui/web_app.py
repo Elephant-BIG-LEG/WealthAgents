@@ -228,13 +228,16 @@ def agent_chat():
                 'session_id': response.get('session_id', ''),
                 'timestamp': response.get('timestamp', time.time())
             },
-            'session_id': response.get('session_id', ''),  # 兼容前端可能直接使用的session_id
+            # 兼容前端可能直接使用的session_id
+            'session_id': response.get('session_id', ''),
             'response': response.get('response', ''),  # 直接在顶层返回AI回答，确保前端能正确获取
-            'detailed_result': response.get('detailed_result', {})  # 添加详细结果，以便前端在需要时使用
+            # 添加详细结果，以便前端在需要时使用
+            'detailed_result': response.get('detailed_result', {})
         }
 
         # 记录响应
-        logger.info(f"Agent响应: {response.get('response', '')[:50] if response.get('response') else '无响应内容'}...")
+        logger.info(
+            f"Agent响应: {response.get('response', '')[:50] if response.get('response') else '无响应内容'}...")
 
         return jsonify(result)
     except Exception as e:
@@ -396,9 +399,13 @@ def collect_data():
 
         # Step 1: 采集数据 - 调用网络爬虫获取数据
         if raw_data is None:
-            # 创建数据源对象
-            source = Source(source_id=source_url,
-                            source_name=source_name, type=source_type)
+            # 创建数据源对象 - 同时传入 source_id 和 url
+            source = Source(
+                source_id=source_url,
+                source_name=source_name,
+                type=source_type,
+                url=source_url  # 添加 url 参数，确保 web_fetcher 能正确获取
+            )
             # 调用采集器获取数据
             collected_items = Collection_action_llm(source)
         else:
@@ -491,24 +498,25 @@ def collect_data():
                 conn.commit()
 
                 logger.info(f"数据已成功写入数据库，ID: {cursor.lastrowid}")
-                
+
                 # Step 6: 向量化并存储到Faiss向量数据库
                 logger.info("开始将数据向量化并存储到Faiss向量数据库...")
                 from app.Embedding.Vectorization import TextVectorizer
                 from app.store.faiss_store import FaissVectorStore
-                
+
                 # 创建向量化器和向量存储实例
                 vectorizer = TextVectorizer()
                 vector_store = FaissVectorStore(dimension=128)
-                
+
                 # 准备要向量化的文本内容
                 text_content = f"{new_data_item['topic']}\n{new_data_item['market_trend']}\n{new_data_item['investment_advice']}\n{new_data_item['hotspot_summary']}"
-                
+
                 # 向量化文本
                 vectors = [vectorizer.vectorize_text(text_content)]
-                
+
                 # 存储向量
-                vector_store.add_vectors([text_content], vectors, source=source_name)
+                vector_store.add_vectors(
+                    [text_content], vectors, source=source_name)
                 logger.info("数据已成功存储到Faiss向量数据库")
 
             except Exception as e:
@@ -643,7 +651,3 @@ def clear_data():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
-
-
-
-

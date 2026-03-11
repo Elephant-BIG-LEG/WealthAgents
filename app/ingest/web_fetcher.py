@@ -55,7 +55,7 @@ def Collection_action_llm(source: Source) -> List[Dict[str, Any]]:
     results = []
     try:
         print(f"开始从数据源 {source.source_id} 收集信息...")
-        
+
         # 检查数据源类型
         if source.type == "web":
             print(f"正在调用fetch_financeWeb_data获取数据，URL: {source.url}")
@@ -124,6 +124,7 @@ class TitleExtractor(HTMLParser):
 
 # 财经网站采集 - 增强版本
 
+
 def fetch_financeWeb_data(source: Union[Source, str]) -> List[Dict[str, Any]]:
     """
     采集财经网站数据（增强版 - 支持自动翻页和文章内容获取）
@@ -134,14 +135,25 @@ def fetch_financeWeb_data(source: Union[Source, str]) -> List[Dict[str, Any]]:
         # 处理source参数，支持Source对象和字符串URL
         if isinstance(source, Source):
             source_id = source.source_id
-            # 优先使用source.url，如果为空则使用source.source_id (兼容旧代码逻辑)
-            current_url = source.url if source.url else source.source_id
-            print(f"开始采集数据源: {source_id}")
+            # 优先使用 source.url，如果为空则使用 source.source_id (兼容旧代码逻辑)
+            current_url = source.url if (
+                hasattr(source, 'url') and source.url) else source.source_id
+            print(f"开始采集数据源：{source_id}, 实际使用 URL: {current_url}")
         else:
             # 字符串URL情况
             source_id = "string_url_source"
             current_url = source
             print(f"开始采集数据源 (URL): {current_url}")
+
+        # 验证 URL 是否有效
+        if not current_url or not isinstance(current_url, str):
+            print(f"错误：无效的 URL: {current_url}")
+            return []
+
+        # 确保 URL 有协议前缀
+        if not current_url.startswith(('http://', 'https://')):
+            print(f"警告：URL 缺少协议前缀，自动添加 https://")
+            current_url = f"https://{current_url}"
 
         # 设置请求头
         headers = {
@@ -333,7 +345,8 @@ def extract_titles_and_links_simple(html_content, base_url):
     seen_titles = set()
     seen_links = set()
     for title, link in title_link_pairs:
-        if title not in seen_titles and link not in seen_links and len(unique_pairs) < 25:  # 限制最大数量
+        # 限制最大数量
+        if title not in seen_titles and link not in seen_links and len(unique_pairs) < 25:
             seen_titles.add(title)
             seen_links.add(link)
             unique_pairs.append((title, link))
@@ -422,13 +435,15 @@ def fetch_article_content_simple(url, headers=None):
                 # 连接所有段落，过滤掉过短的段落
                 content = ' '.join([p for p in paragraphs if len(
                     re.sub(r'<[^>]+>', '', p).strip()) > 20])
-            
+
             # 如果段落内容也不足，尝试提取所有文本内容
             if not content or len(content) < 200:
                 print(f"段落内容不足，尝试提取所有文本: {url}")
                 # 移除脚本和样式
-                text_content = re.sub(r'<script[^>]*>.*?</script>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
-                text_content = re.sub(r'<style[^>]*>.*?</style>', '', text_content, flags=re.DOTALL | re.IGNORECASE)
+                text_content = re.sub(
+                    r'<script[^>]*>.*?</script>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
+                text_content = re.sub(
+                    r'<style[^>]*>.*?</style>', '', text_content, flags=re.DOTALL | re.IGNORECASE)
                 # 移除所有HTML标签
                 text_content = re.sub(r'<[^>]+>', '', text_content)
                 # 清理文本
@@ -466,7 +481,8 @@ def fetch_article_content_simple(url, headers=None):
             if len(clean_content) < 200:
                 print(f"提取的内容过短 ({len(clean_content)} 字符)，尝试其他方式: {url}")
                 # 尝试使用更宽松的正则表达式
-                loose_match = re.search(r'<body[^>]*>(.*?)</body>', html_content, re.DOTALL)
+                loose_match = re.search(
+                    r'<body[^>]*>(.*?)</body>', html_content, re.DOTALL)
                 if loose_match:
                     body_content = loose_match.group(1)
                     body_text = re.sub(r'<[^>]+>', '', body_content)
@@ -565,7 +581,7 @@ def find_next_page_link(html_content, current_url):
                 r'index_(\d+)\.html',
                 r'page_(\d+)\.html'
             ]
-            
+
             for page_pattern in page_patterns:
                 page_match = re.search(page_pattern, current_url)
                 if page_match:
@@ -619,27 +635,32 @@ def find_next_page_link(html_content, current_url):
             if current_page_num is not None:
                 next_page_num = current_page_num + 1
                 # 尝试替换URL中的页码
-                next_url = re.sub(r'page=(\d+)', f'page={next_page_num}', current_url)
+                next_url = re.sub(
+                    r'page=(\d+)', f'page={next_page_num}', current_url)
                 if next_url != current_url:
                     print(f"手动构造下一页链接: {next_url}")
                     return next_url
-                    
-                next_url = re.sub(r'p=(\d+)', f'p={next_page_num}', current_url)
+
+                next_url = re.sub(
+                    r'p=(\d+)', f'p={next_page_num}', current_url)
                 if next_url != current_url:
                     print(f"手动构造下一页链接: {next_url}")
                     return next_url
-                    
-                next_url = re.sub(r'/page/(\d+)', f'/page/{next_page_num}', current_url)
+
+                next_url = re.sub(
+                    r'/page/(\d+)', f'/page/{next_page_num}', current_url)
                 if next_url != current_url:
                     print(f"手动构造下一页链接: {next_url}")
                     return next_url
-                    
-                next_url = re.sub(r'index_(\d+)\.html', f'index_{next_page_num}\.html', current_url)
+
+                next_url = re.sub(r'index_(\d+)\.html',
+                                  f'index_{next_page_num}\.html', current_url)
                 if next_url != current_url:
                     print(f"手动构造下一页链接: {next_url}")
                     return next_url
-                    
-                next_url = re.sub(r'page_(\d+)\.html', f'page_{next_page_num}\.html', current_url)
+
+                next_url = re.sub(r'page_(\d+)\.html',
+                                  f'page_{next_page_num}\.html', current_url)
                 if next_url != current_url:
                     print(f"手动构造下一页链接: {next_url}")
                     return next_url
