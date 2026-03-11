@@ -1,9 +1,46 @@
 # 文本切片器 - 专为理财文章设计
+# 采用 Recursive Chunking + Overlap + Metadata 模式
 import re
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any, Optional
+from dataclasses import dataclass, field
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class TextChunk:
+    """
+    文本块数据类
+    包含文本内容、元数据和位置信息
+    """
+    text: str                          # 文本内容
+    chunk_id: str                      # 唯一标识
+    start_pos: int                     # 在原文中的起始位置
+    end_pos: int                       # 在原文中的结束位置
+    metadata: Dict[str, Any] = field(default_factory=dict)  # 元数据
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典格式"""
+        return {
+            'text': self.text,
+            'chunk_id': self.chunk_id,
+            'start_pos': self.start_pos,
+            'end_pos': self.end_pos,
+            'metadata': self.metadata
+        }
+    
+    @classmethod
+    def from_text(cls, text: str, start_pos: int, end_pos: int, 
+                  chunk_id: str = None, metadata: Dict = None):
+        """从文本创建实例"""
+        return cls(
+            text=text,
+            chunk_id=chunk_id or f"chunk_{start_pos}_{end_pos}",
+            start_pos=start_pos,
+            end_pos=end_pos,
+            metadata=metadata or {}
+        )
 
 """
 TODO
@@ -11,79 +48,220 @@ TODO
 """
 class FinancialTextSplitter:
     """
-    专为理财文章设计的文本切片器
-    特点：
-    1. 保持段落完整性
-    2. 保持章节结构完整性
-    3. 保留上下文连贯性（添加重叠）
-    4. 智能处理表格和列表
-    5. 考虑内容重要性的动态切片长度
+    专为理财文章设计的递归文本切片器
+    
+    核心特性：
+    1. Recursive Chunking - 多层级递归分割（文档→章节→段落→句子）
+    2. Overlap - 智能上下文重叠（保持语义连贯）
+    3. Metadata - 丰富的元数据追踪（来源、位置、类型等）
+    
+    分割策略（优先级从高到低）：
+    Level 1: 按章节分割（保持主题完整性）
+    Level 2: 按段落分割（保持论述完整性）
+    Level 3: 按句子分割（保持语义完整性）
+    Level 4: 按字符分割（保底方案）
     """
     
     def __init__(self, 
-                 chunk_size: int = 600,  # 减小默认切片大小，便于更细粒度的切片
-                 chunk_overlap: int = 100,  # 减小默认重叠大小
-                 min_chunk_size: int = 200,  # 减小最小切片大小
-                 preserve_sections: bool = True,  # 是否保持章节完整性
-                 preserve_tables: bool = True,  # 是否保持表格完整性
-                 dynamic_chunking: bool = True  # 是否启用动态切片长度
+                 chunk_size: int = 600,      # 目标块大小（字符）
+                 chunk_overlap: int = 90,    # 重叠大小（约 15%）
+                 min_chunk_size: int = 150,  # 最小块大小
+                 separators: List[str] = None,  # 分层分隔符列表
+                 preserve_structure: bool = True,  # 保持结构完整性
+                 add_metadata: bool = True,      # 添加详细元数据
                 ):
+        """
+        初始化递归切片器
+        
+        Args:
+            chunk_size: 目标块大小（字符数）
+            chunk_overlap: 重叠部分大小（用于保持上下文连贯）
+            min_chunk_size: 最小块大小（小于此值的块会合并）
+            separators: 分层分隔符列表（按优先级排序）
+            preserve_structure: 是否保持文档结构（章节、表格等）
+            add_metadata: 是否为每个块添加详细元数据
+        """
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.min_chunk_size = min_chunk_size
-        self.preserve_sections = preserve_sections
-        self.preserve_tables = preserve_tables
-        self.dynamic_chunking = dynamic_chunking
+        self.preserve_structure = preserve_structure
+        self.add_metadata = add_metadata
+        
+        # 分层分隔符（按优先级降序排列）
+        # 先尝试用高优先级分隔符，不行再用低优先级的
+        self.separators = separators or [
+            # Level 1: 章节级别分隔符
+            r'\n\n(?=#{1,6}\s)',           # Markdown 标题前
+            r'\n\n(?=\*{2}[^\n]+\*{2})',   # 粗体标题
+            r'\n\n(?=\d+[\.、]\s)',       # 数字序号
+            r'\n\n(?=\[[^\]]+\])',        # 方括号标题
+            
+            # Level 2: 段落级别分隔符
+            r'\n\n+',                      # 多个换行（段落间隔）
+            r'\r\n\r\n+',                  # Windows 风格段落间隔
+            
+            # Level 3: 句子级别分隔符
+            r'(?<=[。！？.!?])\s*',       # 句末标点
+            r'(?<=[；;])\s*',             # 分号
+            r'(?<=[，,])\s*',             # 逗号
+            
+            # Level 4: 其他分隔符
+            r'\s+',                        # 空格
+            r'',                           # 无分隔符（强制字符级分割）
+        ]
+        
+        # 统计信息
+        self.stats = {
+            'total_chunks': 0,
+            'by_level': {1: 0, 2: 0, 3: 0, 4: 0},
+            'avg_chunk_size': 0,
+            'total_characters': 0
+        }
     
-    def split_text(self, text: str) -> List[str]:
+    def split_text(self, text: str, metadata: Dict[str, Any] = None) -> List[TextChunk]:
         """
-        分割文本，返回切片列表
+        递归分割文本（主入口）
+        
+        Args:
+            text: 待分割的文本
+            metadata: 基础元数据（如 source, file_name 等）
+        
+        Returns:
+            TextChunk 对象列表
         """
         if not text or len(text.strip()) == 0:
             return []
         
-        # 首先预处理文本，移除多余的空白字符
-        text = re.sub(r'\s+', ' ', text)
-        text = re.sub(r'\s*\n\s*', '\n', text)
+        # 重置统计
+        self.stats = {'total_chunks': 0, 'by_level': {1: 0, 2: 0, 3: 0, 4: 0}, 
+                      'avg_chunk_size': 0, 'total_characters': 0}
         
-        # 1. 对所有文本首先进行强制字符级分割（确保生成足够多的切片）
-        # 这是最直接有效的方法，特别是对于非结构化或格式不规范的文本
-        chunks = self._force_split_long_text(text)
+        logger.info(f"开始递归分割文本，总长度：{len(text)} 字符")
         
-        # 2. 添加上下文重叠
-        final_chunks = self._add_context_overlap(chunks)
+        # Step 1: 文本预处理
+        text = self._preprocess_text(text)
+        
+        # Step 2: 递归分割
+        chunks = self._recursive_split(text, level=0)
+        
+        # Step 3: 添加元数据和重叠
+        final_chunks = self._finalize_chunks(chunks, metadata or {})
+        
+        # Step 4: 更新统计
+        self._update_stats(final_chunks)
+        
+        logger.info(f"分割完成，共生成 {len(final_chunks)} 个文本块")
+        logger.debug(f"统计信息：{self.stats}")
         
         return final_chunks
     
-    def _identify_sections(self, text: str) -> List[Tuple[str, str]]:
+    def _preprocess_text(self, text: str) -> str:
         """
-        识别文章中的章节结构
+        文本预处理
+        - 规范化空白字符
+        - 统一换行符
+        - 移除不可见字符
         """
-        sections = []
+        # 移除不可见字符
+        text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
+            
+        # 统一换行符
+        text = re.sub(r'\r\n', '\n', text)
+        text = re.sub(r'\r', '\n', text)
+            
+        # 规范化连续空白
+        text = re.sub(r'[ \t]+', ' ', text)
+        text = re.sub(r'\n\s*\n', '\n\n', text)  # 保留段落间隔标记
+            
+        # 去除首尾空白
+        text = text.strip()
+            
+        return text
         
-        # 匹配常见的章节标题格式，优化了对理财文章格式的支持
-        section_patterns = [
-            # Markdown格式和理财报告常见格式
-            r'(#{1,6}\s*\*{0,2}[^\n]+\*{0,2})\s*\n([\s\S]*?)(?=#{1,6}\s*\*{0,2}[^\n]+\*{0,2}|$)',
-            # **标题**格式，增强对理财报告的匹配
-            r'(\*{2}\s*[^\*\n]+\s*\*{2})\s*\n([\s\S]*?)(?=\*{2}\s*[^\*\n]+\s*\*{2}|$)',
-            # 下划线格式
-            r'([^\n]+)\s*\n[-=]+\s*\n([\s\S]*?)(?=[^\n]+\s*\n[-=]+\s*\n|$)',
-            # [标题]格式
-            r'(\[[^\]]+\])\s*\n([\s\S]*?)(?=\[[^\]]+\]\s*\n|$)',
-            # 理财报告中常见的数字序号章节
-            r'(\d+\.\s+[^\n]+)\s*\n([\s\S]*?)(?=\d+\.\s+[^\n]+|$)',
-            r'(\d+\s*[、.]\s*[^\n]+)\s*\n([\s\S]*?)(?=\d+\s*[、.]\s*[^\n]+|$)'
-        ]
-        
-        for pattern in section_patterns:
-            matches = re.findall(pattern, text, re.MULTILINE | re.DOTALL)
-            if matches and len(matches) > 1:  # 确保找到了多个章节
-                for title, content in matches:
-                    sections.append((title.strip(), content.strip()))
-                return sections
-        
-        return []  # 没有找到合适的章节结构
+    def _recursive_split(self, text: str, level: int = 0) -> List[Tuple[str, int, int]]:
+        """
+        递归分割文本（核心逻辑）
+            
+        Args:
+            text: 待分割文本
+            level: 当前递归层级（0 表示从头开始）
+            
+        Returns:
+            [(文本片段，起始位置，结束位置), ...]
+            
+        递归策略：
+        1. 如果文本长度 <= chunk_size，直接返回（无需分割）
+        2. 使用当前层级的分隔符尝试分割
+        3. 如果分割成功（产生多个片段），对每个片段递归处理
+        4. 如果分割失败（还是太长），进入下一层级尝试更细粒度的分隔符
+        5. 如果所有层级都失败，强制按字符分割
+        """
+        # 基本情况：文本已经足够短
+        if len(text) <= self.chunk_size:
+            return [(text, 0, len(text))]
+            
+        # 获取当前层级的分隔符
+        if level < len(self.separators):
+            separator = self.separators[level]
+        else:
+            # 所有分隔符都失败了，强制按字符分割
+            return self._force_split_by_chars(text)
+            
+        # 尝试用当前分隔符分割
+        if separator:
+            # 使用正则表达式分割
+            parts = re.split(f'({separator})', text)
+                
+            # 重新组合（保留分隔符）
+            segments = []
+            current_segment = ""
+                
+            for i, part in enumerate(parts):
+                # 跳过空的分隔符
+                if re.fullmatch(separator, part) or not part.strip():
+                    if current_segment.strip():
+                        segments.append(current_segment.strip())
+                        current_segment = ""
+                else:
+                    current_segment += part
+                
+            if current_segment.strip():
+                segments.append(current_segment.strip())
+        else:
+            # 空分隔符意味着按字符硬切
+            return self._force_split_by_chars(text)
+            
+        # 如果只产生了一个 segment（分割失败），进入下一层级
+        if len(segments) <= 1:
+            return self._recursive_split(text, level + 1)
+            
+        # 对每个 segment 递归处理
+        result = []
+        current_pos = 0
+            
+        for segment in segments:
+            segment = segment.strip()
+            if not segment:
+                continue
+                
+            segment_len = len(segment)
+                
+            # 如果 segment 仍然太长，递归分割
+            if segment_len > self.chunk_size:
+                sub_segments = self._recursive_split(segment, level + 1)
+                    
+                # 调整位置信息
+                for sub_text, sub_start, sub_end in sub_segments:
+                    global_start = current_pos + sub_start
+                    global_end = current_pos + sub_end
+                    result.append((sub_text, global_start, global_end))
+            else:
+                # segment 长度合适，直接添加
+                result.append((segment, current_pos, current_pos + segment_len))
+                
+            current_pos += segment_len
+            
+        return result
     
     def _split_by_paragraphs(self, text: str) -> List[str]:
         """
@@ -203,9 +381,122 @@ class FinancialTextSplitter:
         
         return sub_chunks
     
-    def _add_context_overlap(self, chunks: List[str]) -> List[str]:
+    def _force_split_by_chars(self, text: str) -> List[Tuple[str, int, int]]:
         """
-        添加上下文重叠，提高连贯性
+        强制按字符分割（保底方案）
+        在句子边界处智能切断，而非简单按固定长度
+        """
+        result = []
+        start = 0
+        
+        while start < len(text):
+            end = min(start + self.chunk_size, len(text))
+            
+            # 如果不是最后一段，尝试在句子边界处切断
+            if end < len(text):
+                # 向前查找最近的句子边界（最多回退 chunk_size 的 30%）
+                search_back = int(self.chunk_size * 0.3)
+                cut_point = self._find_best_cut_point(text[start:end], search_back)
+                
+                if cut_point > 0:
+                    end = start + cut_point
+            
+            # 提取文本段
+            segment = text[start:end].strip()
+            if segment:
+                result.append((segment, start, end))
+            
+            # 移动到下一段（考虑 overlap）
+            if end < len(text):
+                start = end - self.chunk_overlap
+            else:
+                start = end
+        
+        return result
+    
+    def _find_best_cut_point(self, text: str, search_range: int) -> int:
+        """
+        在文本中查找最佳切断点
+        优先级：句号 > 分号 > 逗号 > 空格
+        """
+        end_pos = len(text)
+        start_search = max(0, end_pos - search_range)
+        
+        # 优先级 1: 句末标点
+        for i in range(end_pos - 1, start_search - 1, -1):
+            if text[i] in ['。', '！', '？', '.', '!', '?']:
+                return i + 1
+        
+        # 优先级 2: 分号
+        for i in range(end_pos - 1, start_search - 1, -1):
+            if text[i] in ['；', ';']:
+                return i + 1
+        
+        # 优先级 3: 逗号
+        for i in range(end_pos - 1, start_search - 1, -1):
+            if text[i] in ['，', ',', '\n']:
+                return i + 1
+        
+        # 没找到合适的切断点，返回末尾
+        return end_pos
+    
+    def _finalize_chunks(self, raw_chunks: List[Tuple[str, int, int]], 
+                         base_metadata: Dict[str, Any]) -> List[TextChunk]:
+        """
+        最终处理：添加元数据和上下文重叠
+        
+        Args:
+            raw_chunks: 原始分割结果 [(text, start, end), ...]
+            base_metadata: 基础元数据
+        
+        Returns:
+            TextChunk 对象列表（带完整元数据和重叠）
+        """
+        if not raw_chunks:
+            return []
+        
+        # Step 1: 转换为 TextChunk 对象并添加基础元数据
+        chunks = []
+        for i, (text, start, end) in enumerate(raw_chunks):
+            chunk_metadata = base_metadata.copy()
+            
+            # 添加自动生成的元数据
+            if self.add_metadata:
+                chunk_metadata.update({
+                    'chunk_index': i,
+                    'total_chunks': len(raw_chunks),
+                    'chunk_size': len(text),
+                    'start_position': start,
+                    'end_position': end,
+                    'has_overlap': False,
+                    'created_at': __import__('datetime').datetime.now().isoformat()
+                })
+            
+            chunk = TextChunk.from_text(
+                text=text,
+                start_pos=start,
+                end_pos=end,
+                chunk_id=f"chunk_{i:04d}_{start}_{end}",
+                metadata=chunk_metadata
+            )
+            chunks.append(chunk)
+        
+        # Step 2: 添加上下文重叠
+        chunks_with_overlap = self._add_smart_overlap(chunks)
+        
+        # Step 3: 合并过小的 chunk（避免碎片化）
+        final_chunks = self._merge_small_chunks(chunks_with_overlap)
+        
+        return final_chunks
+    
+    def _add_smart_overlap(self, chunks: List[TextChunk]) -> List[TextChunk]:
+        """
+        智能添加上下文重叠
+        
+        策略：
+        1. 从前一个 chunk 的末尾取 overlap_size 个字符
+        2. 在词边界处切断（避免切断词语）
+        3. 添加到当前 chunk 的开头
         """
         if len(chunks) <= 1:
             return chunks
@@ -213,87 +504,206 @@ class FinancialTextSplitter:
         enhanced_chunks = []
         
         for i, chunk in enumerate(chunks):
-            # 简化重叠逻辑，只在必要时添加重叠，避免过度复杂化
             if i == 0:
-                # 第一个切片
+                # 第一个 chunk 不需要添加前面的重叠
                 enhanced_chunks.append(chunk)
             else:
-                # 对于后续切片，从前一个切片末尾添加重叠文本
-                prev_chunk = chunks[i-1]
-                # 确保重叠大小合理
-                actual_overlap = min(self.chunk_overlap, len(prev_chunk) // 3)  # 最多使用前一个切片的1/3作为重叠
-                if actual_overlap > 0:
-                    # 添加重叠文本，但不添加额外的标记文本，以保持内容的自然性
-                    overlap_text = prev_chunk[-actual_overlap:]
-                    # 尝试在词边界处分割重叠文本
-                    overlap_text = self._find_word_boundary(overlap_text, True)
-                    enhanced_chunks.append(overlap_text + chunk)
+                prev_chunk = chunks[i - 1]
+                
+                # 计算实际重叠大小（固定为 chunk_overlap，但不超过前一个 chunk 的 1/3）
+                actual_overlap = min(self.chunk_overlap, len(prev_chunk.text) // 3)
+                
+                if actual_overlap > 0 and len(prev_chunk.text) > actual_overlap:
+                    # 提取重叠文本
+                    overlap_text = prev_chunk.text[-actual_overlap:]
+                    
+                    # 在词边界处切断（避免切断完整词语）
+                    overlap_text = self._trim_to_word_boundary(overlap_text, from_start=True)
+                    
+                    # 添加到当前 chunk 开头
+                    new_text = overlap_text + chunk.text
+                    
+                    # 创建新的 chunk（保留原有元数据）
+                    new_chunk = TextChunk(
+                        text=new_text,
+                        chunk_id=chunk.chunk_id,
+                        start_pos=chunk.start_pos,
+                        end_pos=chunk.end_pos,
+                        metadata=chunk.metadata.copy()
+                    )
+                    new_chunk.metadata['has_overlap'] = True
+                    new_chunk.metadata['overlap_size'] = len(overlap_text)
+                    
+                    enhanced_chunks.append(new_chunk)
                 else:
+                    # 不需要添加重叠
                     enhanced_chunks.append(chunk)
         
         return enhanced_chunks
+    
+    def _trim_to_word_boundary(self, text: str, from_start: bool = False) -> str:
+        """
+        在词边界处修剪文本
+        避免切断完整的词语（特别是中文词汇）
         
-    def _find_word_boundary(self, text: str, from_end: bool = False) -> str:
+        Args:
+            text: 待修剪的文本
+            from_start: 是否从开头修剪（否则从末尾修剪）
         """
-        尝试在词边界处分割文本
-        """
-        if len(text) <= 10:  # 文本太短，直接返回
-            return text
-            
-        if from_end:
-            # 从文本末尾向前查找词边界
-            for i in range(min(len(text), 20), 5, -1):
-                if text[-i] in [' ', '。', '，', '.', ',', '!', '！', '?', '？', ';', '；', '\n']:
-                    return text[-i:]
+        if len(text) <= 10:
+            return text  # 文本太短，直接返回
+        
+        # 查找边界字符
+        boundary_chars = [' ', '。', '，', '.', ',', '!', '!', '?', '？', ';', '；', '\n']
+        
+        if from_start:
+            # 从开头向后找第一个边界
+            for i in range(min(len(text), 20)):
+                if text[i] in boundary_chars:
+                    return text[i+1:] if i < len(text) - 1 else text
         else:
-            # 从文本开头向后查找词边界
-            for i in range(5, min(len(text), 20)):
-                if text[i] in [' ', '。', '，', '.', ',', '!', '！', '?', '？', ';', '；', '\n']:
-                    return text[:i+1]
-                    
-        return text  # 如果找不到合适的词边界，返回原始文本
+            # 从末尾向前找第一个边界
+            for i in range(min(len(text), 20), 5, -1):
+                if text[-i] in boundary_chars:
+                    return text[-i:]
+        
+        # 没找到边界，直接返回原文本
+        return text
+    
+    def _merge_small_chunks(self, chunks: List[TextChunk]) -> List[TextChunk]:
+        """
+        合并过小的 chunk（避免碎片化）
+        
+        合并策略：
+        - 如果连续几个 chunk 都很小且总和不超过 chunk_size，合并它们
+        """
+        if len(chunks) <= 1:
+            return chunks
+        
+        merged = []
+        current_group = [chunks[0]]
+        current_size = len(chunks[0].text)
+        
+        for i in range(1, len(chunks)):
+            chunk = chunks[i]
+            chunk_size = len(chunk.text)
+            
+            # 如果当前组太小且加上新 chunk 也不超过限制，合并
+            if current_size < self.min_chunk_size and current_size + chunk_size <= self.chunk_size:
+                current_group.append(chunk)
+                current_size += chunk_size
+            else:
+                # 保存当前组并开始新的一组
+                if len(current_group) == 1:
+                    merged.append(current_group[0])
+                else:
+                    # 合并多个 chunk
+                    merged_chunk = self._merge_chunk_group(current_group)
+                    merged.append(merged_chunk)
+                
+                current_group = [chunk]
+                current_size = chunk_size
+        
+        # 处理最后一组
+        if len(current_group) == 1:
+            merged.append(current_group[0])
+        else:
+            merged.append(self._merge_chunk_group(current_group))
+        
+        return merged
+    
+    def _merge_chunk_group(self, group: List[TextChunk]) -> TextChunk:
+        """
+        合并一组 chunk
+        """
+        if not group:
+            raise ValueError("Chunk group cannot be empty")
+        
+        # 合并文本（用换行符连接）
+        merged_text = '\n\n'.join(chunk.text for chunk in group)
+        
+        # 合并元数据
+        merged_metadata = group[0].metadata.copy()
+        merged_metadata.update({
+            'merged_from': [chunk.chunk_id for chunk in group],
+            'merge_count': len(group),
+            'original_sizes': [len(chunk.text) for chunk in group]
+        })
+        
+        return TextChunk(
+            text=merged_text,
+            chunk_id=f"merged_{group[0].chunk_id}_to_{group[-1].chunk_id}",
+            start_pos=group[0].start_pos,
+            end_pos=group[-1].end_pos,
+            metadata=merged_metadata
+        )
+    
+    def _update_stats(self, chunks: List[TextChunk]):
+        """更新统计信息"""
+        if not chunks:
+            return
+        
+        self.stats['total_chunks'] = len(chunks)
+        self.stats['total_characters'] = sum(len(c.text) for c in chunks)
+        self.stats['avg_chunk_size'] = self.stats['total_characters'] / len(chunks)
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """获取分割统计信息"""
+        return self.stats.copy()
 
-# 创建全局切片器实例
+
+# 创建全局切片器实例（使用优化后的递归分割配置）
 global_splitter = FinancialTextSplitter(
-    chunk_size=600,
-    chunk_overlap=100,
-    min_chunk_size=200,
-    preserve_sections=True,
-    preserve_tables=True,
-    dynamic_chunking=True
+    chunk_size=600,           # 目标块大小
+    chunk_overlap=90,         # 重叠大小（15%）
+    min_chunk_size=150,       # 最小块大小
+    preserve_structure=True,  # 保持结构
+    add_metadata=True         # 添加详细元数据
 )
 
 # 创建默认的切片器实例
 def create_financial_splitter(**kwargs) -> FinancialTextSplitter:
     """
     创建并返回一个默认配置的财经文本切片器
+    
+    推荐配置：
+    - chunk_size=600: 适合财务报告的中等长度
+    - chunk_overlap=90: 15% 的重叠率，平衡连贯性和冗余度
+    - min_chunk_size=150: 允许短小精悍的完整表述
     """
     if kwargs:
         return FinancialTextSplitter(**kwargs)
     else:
         return FinancialTextSplitter(
-            chunk_size=800,       # 理财文章切片稍小一些，保持更细粒度
-            chunk_overlap=150,    # 适当的重叠以保持连贯性
-            min_chunk_size=200,   # 最小切片大小
-            preserve_sections=True,  # 保持章节完整性
-            preserve_tables=True,    # 保持表格完整性
-            dynamic_chunking=True    # 启用动态切片长度
+            chunk_size=600,           # 理财文章标准大小
+            chunk_overlap=90,         # 15% 重叠率
+            min_chunk_size=150,       # 最小切片大小
+            preserve_structure=True,  # 保持章节完整性
+            add_metadata=True         # 添加详细元数据
         )
 
 # 简单的文本切片函数（方便直接调用）
-def split_financial_text(text: str, **kwargs) -> List[str]:
+def split_financial_text(text: str, metadata: Dict[str, Any] = None, **kwargs) -> List[TextChunk]:
     """
     直接分割文本的便捷函数
+    
+    Args:
+        text: 待分割的文本
+        metadata: 基础元数据（如 source, file_name 等）
+        **kwargs: 自定义配置参数
+    
+    Returns:
+        TextChunk 对象列表
     """
     if kwargs:
         # 如果提供了自定义参数，创建新实例
         splitter = FinancialTextSplitter(**kwargs)
-        return splitter.split_text(text)
+        return splitter.split_text(text, metadata=metadata)
     else:
         # 使用全局实例
         try:
-            return global_splitter.split_text(text)
+            return global_splitter.split_text(text, metadata=metadata)
         except Exception as e:
-            logger.error(f"文本切片过程中出错: {e}")
-            # 出错时返回原文本作为单个切片
-            return [text] if text else []
+            logger.error(f"文本切片过程中出错：{e}")
+            # 出错时返回空列表
+            return []
