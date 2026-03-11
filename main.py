@@ -39,7 +39,9 @@ def main():
     elif choice == "2":
         # Web界面模式
         print("启动Flask Web界面...")
-        os.system("D:\\MinConda\\python.exe -m app.ui.web_app")
+        # 使用当前Python环境启动Web应用，而不是硬编码的Miniconda路径
+        import sys
+        os.system(f"{sys.executable} -m app.ui.web_app")
 
     elif choice == "3":
         # 向量化测试模式

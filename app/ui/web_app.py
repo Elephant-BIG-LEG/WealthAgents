@@ -264,19 +264,19 @@ def dashboard_stats():
             cursor = conn.cursor()
             try:
                 # 获取总数据量
-                cursor.execute("SELECT COUNT(*) as count FROM recenthottopics")
+                cursor.execute("SELECT COUNT(*) as count FROM RecentHotTopics")
                 result = cursor.fetchone()
                 stats['total_data'] = result['count'] if result else 0
 
                 # 获取热点话题数量
                 cursor.execute(
-                    "SELECT COUNT(DISTINCT topic) as count FROM recenthottopics")
+                    "SELECT COUNT(DISTINCT topic) as count FROM RecentHotTopics")
                 result = cursor.fetchone()
                 stats['hot_topics'] = result['count'] if result else 0
 
                 # 获取最近30天的数据量作为股票分析数量
                 cursor.execute("""
-                    SELECT COUNT(*) as count FROM recenthottopics 
+                    SELECT COUNT(*) as count FROM RecentHotTopics 
                     WHERE created_ts >= DATE_SUB(NOW(), INTERVAL 30 DAY)
                 """)
                 result = cursor.fetchone()
@@ -551,7 +551,7 @@ def get_data():
             cursor = conn.cursor()
             try:
                 cursor.execute(
-                    "SELECT topic, article_content, investment_advice, market_summary, source FROM recenthottopics ORDER BY id DESC LIMIT 50")
+                    "SELECT topic, article_content, investment_advice, market_summary, source FROM RecentHotTopics ORDER BY id DESC LIMIT 50")
                 results = cursor.fetchall()
 
                 # 格式化数据
@@ -617,7 +617,7 @@ def clear_data():
         if conn:
             cursor = conn.cursor()
             try:
-                cursor.execute("DELETE FROM recenthottopics")
+                cursor.execute("DELETE FROM RecentHotTopics")
                 conn.commit()
                 logger.info("数据库中的数据已清除")
             except Exception as e:
