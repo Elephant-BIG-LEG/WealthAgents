@@ -63,7 +63,9 @@ class EnhancedReflector:
             "key_findings": [],
             "recommendations": [],
             "learning_points": [],
-            "convergence_status": False
+            "convergence_status": False,
+            # 预留给规划器的结构化调整建议
+            "planning_adjustments": {}
         }
 
         # Step 1: 计算成功率
@@ -101,6 +103,14 @@ class EnhancedReflector:
         # Step 7: 判断是否收敛
         reflection['convergence_status'] = success_rate >= convergence_threshold
 
+        # Step 8: 为规划器生成结构化的调整建议（工具选择 + 是否需要重规划）
+        planning_adjustments = self._build_planning_adjustments(
+            success_rate=success_rate,
+            root_cause=root_cause,
+            tool_call_history=tool_call_history
+        )
+        reflection['planning_adjustments'] = planning_adjustments
+
         # 保存到记忆
         if self.memory_manager:
             self.memory_manager.save_intermediate_result(
@@ -109,6 +119,65 @@ class EnhancedReflector:
         self.logger.info(
             f"[深度反思] 完成，成功率：{success_rate:.2%}, 收敛：{reflection['convergence_status']}")
         return reflection
+
+    def _build_planning_adjustments(
+        self,
+        success_rate: float,
+        root_cause: Dict[str, Any],
+        tool_call_history: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        为规划器生成结构化的调整建议
+
+        - avoid_tools: 错误率较高、应优先避开的工具
+        - prefer_tools: 表现稳定、可优先选择的工具
+        - needs_replan: 是否建议整体重规划
+        """
+        adjustments: Dict[str, Any] = {
+            "avoid_tools": [],
+            "prefer_tools": [],
+            "needs_replan": False
+        }
+
+        # 汇总每个工具的成功/失败情况
+        tool_stats: Dict[str, Dict[str, int]] = {}
+        for record in tool_call_history or []:
+            tool_name = record.get("tool_name")
+            result = record.get("result", {})
+            status = result.get("status")
+
+            if not tool_name:
+                continue
+
+            stats = tool_stats.setdefault(
+                tool_name, {"success": 0, "error": 0})
+            if status == "success":
+                stats["success"] += 1
+            elif status == "error":
+                stats["error"] += 1
+
+        # 计算每个工具的错误率/成功率
+        for tool_name, stats in tool_stats.items():
+            total = stats["success"] + stats["error"]
+            if total == 0:
+                continue
+
+            error_ratio = stats["error"] / total
+            success_ratio = stats["success"] / total
+
+            # 错误率超过 50% 的工具，标记为需要规避
+            if error_ratio >= 0.5:
+                adjustments["avoid_tools"].append(tool_name)
+
+            # 成功率高且有一定样本的工具，标记为优先选择
+            if success_ratio >= 0.8 and stats["success"] >= 2:
+                adjustments["prefer_tools"].append(tool_name)
+
+        # 结合整体成功率和规划问题，判断是否建议重规划
+        if success_rate < 0.5 or root_cause.get("planning_issue", False):
+            adjustments["needs_replan"] = True
+
+        return adjustments
 
     def intelligent_decision(
         self,

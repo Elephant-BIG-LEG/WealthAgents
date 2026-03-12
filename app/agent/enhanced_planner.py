@@ -331,24 +331,42 @@ class EnhancedPlanner:
         }
 
     def _apply_reflection_adjustments(self, plan: List[Dict[str, Any]], reflection: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """根据反思结果调整计划"""
-        adjustments = reflection.get('recommendations', [])
+        """根据反思结果调整计划（工具选择优化 + 任务规划优化）"""
+        # 文本型建议（向后兼容）
+        recommendations = reflection.get('recommendations', []) or []
+        # 结构化的规划调整建议（由 EnhancedReflector 提供）
+        planning_adjustments = reflection.get(
+            'planning_adjustments', {}) or {}
 
-        if not adjustments:
-            return plan
+        # 拷贝一份计划，避免原地修改
+        adjusted_plan: List[Dict[str, Any]] = [dict(task) for task in plan]
 
-        # 应用调整建议
-        adjusted_plan = plan.copy()
+        # 1) 工具选择优化：根据 avoid_tools / prefer_tools 调整任务
+        avoid_tools = set(planning_adjustments.get('avoid_tools', []))
+        prefer_tools = set(planning_adjustments.get('prefer_tools', []))
 
-        for adjustment in adjustments:
-            if '工具' in adjustment and '失败' in adjustment:
-                # 如果反思提到某个工具失败，添加备选工具任务
-                for task in adjusted_plan:
-                    if adjustment.get('failed_tool') in task.get('tool_name', ''):
-                        task['fallback_tools'] = ['general_query']
+        if avoid_tools:
+            for task in adjusted_plan:
+                if task.get('tool_name') in avoid_tools:
+                    # 标记该工具应当规避，并提供兜底工具
+                    task['avoid'] = True
+                    fallback = task.get('fallback_tools') or []
+                    if 'general_query' not in fallback:
+                        fallback.append('general_query')
+                    task['fallback_tools'] = fallback
 
-            if '效率' in adjustment:
-                # 如果需要提高效率，标记更多任务为可并行
+        if prefer_tools:
+            for task in adjusted_plan:
+                if task.get('tool_name') in prefer_tools:
+                    # 提高优先级，让表现好的工具先执行
+                    current_priority = task.get('priority', 'medium')
+                    if current_priority in ['low', 'medium']:
+                        task['priority'] = 'high'
+
+        # 2) 从文本建议中抽取「效率优化」信号，推动更多任务并行化
+        for text in recommendations:
+            text_str = str(text)
+            if '效率' in text_str or '并行' in text_str:
                 for task in adjusted_plan:
                     if not task.get('dependencies'):
                         task['can_parallel'] = True

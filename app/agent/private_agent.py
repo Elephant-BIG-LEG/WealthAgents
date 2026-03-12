@@ -192,12 +192,30 @@ class PrivateAgent:
             
             # 2. 意图识别 + 任务拆解（轻量LLM）
             self.logger.info("开始意图识别和任务拆解")
-            
-            # 使用现有规划器进行意图识别和任务拆解
+
+            # 尝试读取上一轮的计划反思结果，用于指导当前规划
+            previous_reflections: List[Dict[str, Any]] = []
+            adjustment_suggestions: List[str] = []
+            try:
+                last_plan_reflection = self.memory_manager.get_intermediate_result(
+                    session_id, "plan_reflection"
+                )
+                if last_plan_reflection:
+                    previous_reflections.append(last_plan_reflection)
+                    adjustment_suggestions.extend(
+                        last_plan_reflection.get("improvements", [])
+                    )
+                    self.logger.info(
+                        f"加载上一轮计划反思结果，改进建议数量: {len(adjustment_suggestions)}"
+                    )
+            except Exception as e:
+                self.logger.warning(f"加载历史反思结果失败: {str(e)}", exc_info=True)
+
+            # 使用规划器进行意图识别和任务拆解
             planning_context = {
                 "user_request": user_request,
-                "previous_reflections": [],
-                "adjustment_suggestions": []
+                "previous_reflections": previous_reflections,
+                "adjustment_suggestions": adjustment_suggestions
             }
             
             # 调用规划器生成任务计划，这一步包含了意图识别
@@ -217,9 +235,9 @@ class PrivateAgent:
             
             # 4. 知识获取（向量/SQL/搜索/工具）
             self.logger.info("开始知识获取")
-            
-            # 执行任务获取知识
-            task_results = []
+
+            # 执行任务获取知识（Act）
+            task_results: List[Dict[str, Any]] = []
             for task in tasks:
                 try:
                     # 调用执行器执行单个任务
@@ -235,12 +253,51 @@ class PrivateAgent:
                         "result": None,
                         "error": str(e)
                     })
+
+            # 5. 计划级反思（Reflect）
+            self.logger.info("开始计划级反思")
+            try:
+                # 提取与反思器接口兼容的结果列表
+                execution_results: List[Dict[str, Any]] = []
+                for tr in task_results:
+                    task = tr["task"]
+                    result = tr.get("result")
+                    if result is not None:
+                        execution_results.append(result)
+                    else:
+                        # 构造一个标准错误结果，保证反思器有完整字段可用
+                        execution_results.append({
+                            "task_id": task.get("id"),
+                            "task_name": task.get("name"),
+                            "tool_name": task.get("tool_name"),
+                            "status": "error",
+                            "execution_time": 0,
+                            "error": tr.get("error", "unknown error")
+                        })
+
+                plan_reflection = self.reflector.reflect_on_plan_execution(
+                    tasks, execution_results
+                )
+
+                # 将反思结果写入当前规划上下文，便于下一轮使用
+                planning_context["previous_reflections"].append(plan_reflection)
+                planning_context["adjustment_suggestions"].extend(
+                    plan_reflection.get("improvements", [])
+                )
+
+                # 以会话为维度保存一份中间反思结果
+                self.memory_manager.save_intermediate_result(
+                    session_id, "plan_reflection", plan_reflection
+                )
+            except Exception as e:
+                self.logger.error(f"计划级反思失败: {str(e)}", exc_info=True)
+
+            # 6. 上下文重组
+            reorganized_context = self._reorganize_context(
+                user_request, conversation_history, task_results
+            )
             
-            # 5. 上下文重组
-            # 5. 上下文重组
-            reorganized_context = self._reorganize_context(user_request, conversation_history, task_results)
-            
-            # 6. 最终大模型生成
+            # 7. 最终大模型生成
             self.logger.info("开始最终大模型生成")
             try:
                 # 使用response_generator生成最终回复
@@ -267,7 +324,7 @@ class PrivateAgent:
             
             self.logger.info("最终大模型生成完成")
             
-            # 7. 后处理（格式/校验/记忆）
+            # 8. 后处理（格式/校验/记忆）
             self.logger.info("开始后处理")
             
             # 更新会话历史
@@ -505,28 +562,30 @@ class PrivateAgent:
         
         for task in tasks:
             tool_name = task.get("tool_name", "")
-            
+            # 兼容 Planner/EnhancedPlanner 生成的字段名
+            params = task.get("parameters", task.get("params", {}))
+
             if tool_name in ["knowledge_base_tool", "summary_tool"]:
                 knowledge_requirements["needs_knowledge"] = True
                 knowledge_requirements["knowledge_types"].append("vector")
-                knowledge_requirements["vector_queries"].append(task.get("params", {}).get("query", ""))
+                knowledge_requirements["vector_queries"].append(params.get("query", ""))
             
             elif tool_name in ["database_tool", "data_analysis"]:
                 knowledge_requirements["needs_knowledge"] = True
                 knowledge_requirements["knowledge_types"].append("sql")
-                knowledge_requirements["sql_queries"].append(task.get("params", {}).get("search_keyword", ""))
+                knowledge_requirements["sql_queries"].append(params.get("search_keyword", ""))
             
             elif tool_name in ["web_scraping_tool", "news_analysis"]:
                 knowledge_requirements["needs_knowledge"] = True
                 knowledge_requirements["knowledge_types"].append("search")
-                knowledge_requirements["search_queries"].append(task.get("params", {}).get("query", ""))
+                knowledge_requirements["search_queries"].append(params.get("query", ""))
             
             elif tool_name in self.available_tools:
                 knowledge_requirements["needs_knowledge"] = True
                 knowledge_requirements["knowledge_types"].append("tool")
                 knowledge_requirements["tool_calls"].append({
                     "tool_name": tool_name,
-                    "params": task.get("params", {})
+                    "params": params
                 })
         
         # 去重知识类型
