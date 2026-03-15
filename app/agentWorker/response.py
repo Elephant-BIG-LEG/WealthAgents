@@ -67,50 +67,56 @@ class ResponseGenerator:
         for task in tasks:
             try:
                 # 检查任务状态和结果格式
-                # 任务结构可能是直接包含parsed_data，或者是执行器返回的完整结果
+                # 任务结构可能是直接包含结果，或者是执行器返回的完整结果
                 task_result_data = None
 
                 if "result" in task and isinstance(task["result"], dict):
-                    # 检查是否直接在task["result"]中包含parsed_data
+                    # 情况1：直接在task["result"]中包含结果
                     if "parsed_data" in task["result"]:
                         task_result_data = task["result"]
-                    # 或者检查是否是执行器返回的格式，其中实际结果在task["result"]["result"]中
+                    # 情况2：执行器返回的格式，实际结果在task["result"]["result"]中
                     elif "result" in task["result"] and isinstance(task["result"]["result"], dict):
-                        if "parsed_data" in task["result"]["result"]:
-                            task_result_data = task["result"]["result"]
+                        task_result_data = task["result"]["result"]
+                    # 情况3：web_scraping_tool直接返回的结果格式
+                    elif "status" in task["result"] and "data" in task["result"]:
+                        task_result_data = task["result"]
 
                 if task_result_data:
+                    # 处理不同工具的返回格式
+                    if "parsed_data" in task_result_data:
+                        # 处理标准parsed_data格式
+                        data_items = task_result_data["parsed_data"]
+                        content_field = "summary"  # 默认使用summary字段
+                    elif "data" in task_result_data and task_result_data["status"] == "success":
+                        # 处理web_scraping_tool返回的data格式
+                        data_items = task_result_data["data"]
+                        content_field = "content"  # web_scraping_tool使用content字段
+                    else:
+                        # 不支持的格式，跳过
+                        continue
 
-                    parsed_data = task_result_data["parsed_data"]
+                    # 确保data_items是列表格式
+                    if not isinstance(data_items, list):
+                        data_items = [data_items]
 
-                    # 处理 parsed_data 是数组的情况
-                    if isinstance(parsed_data, list):
-                        for item in parsed_data:
-                            if isinstance(item, dict) and "title" in item and "summary" in item:
-                                # 创建任务内容的唯一标识符（基于标题和摘要的组合）
-                                content_identifier = f"{item['title']}|{item['summary']}"
+                    # 处理数据项列表
+                    for item in data_items:
+                        if isinstance(item, dict) and "title" in item:
+                            # 获取内容字段，优先使用content_field，否则尝试其他可能的字段
+                            content = item.get(content_field, item.get("summary", item.get("content", "")))
+                            
+                            # 创建任务内容的唯一标识符（基于标题和内容的组合）
+                            content_identifier = f"{item['title']}|{content[:100]}"  # 使用前100个字符作为标识
 
-                                # 检查是否已存在相同内容的任务结果
-                                if content_identifier not in seen_contents:
-                                    seen_contents.add(content_identifier)
-                                    task_outputs.append(
-                                        f"标题: {item['title']}\n摘要: {item['summary']}")
-                                    logger.debug(f"添加任务输出: {item['title']}")
-                                else:
-                                    logger.debug(f"跳过重复任务结果: {item['title']}")
-                    # 处理 parsed_data 是单个对象的情况
-                    elif isinstance(parsed_data, dict) and "title" in parsed_data and "summary" in parsed_data:
-                        # 创建任务内容的唯一标识符（基于标题和摘要的组合）
-                        content_identifier = f"{parsed_data['title']}|{parsed_data['summary']}"
-
-                        # 检查是否已存在相同内容的任务结果
-                        if content_identifier not in seen_contents:
-                            seen_contents.add(content_identifier)
-                            task_outputs.append(
-                                f"标题: {parsed_data['title']}\n摘要: {parsed_data['summary']}")
-                            logger.debug(f"添加任务输出: {parsed_data['title']}")
-                        else:
-                            logger.debug(f"跳过重复任务结果: {parsed_data['title']}")
+                            # 检查是否已存在相同内容的任务结果
+                            if content_identifier not in seen_contents:
+                                seen_contents.add(content_identifier)
+                                # 使用统一的格式添加任务输出
+                                task_outputs.append(
+                                    f"标题: {item['title']}\n内容: {content}")
+                                logger.debug(f"添加任务输出: {item['title']}")
+                            else:
+                                logger.debug(f"跳过重复任务结果: {item['title']}")
             except Exception as e:
                 logger.debug(f"收集任务输出时出错: {str(e)}")
                 continue
