@@ -46,6 +46,8 @@ class EnhancedRAGRetriever:
         self.enable_hybrid = enable_hybrid
         self.enable_rerank = enable_rerank
         self.enable_query_rewrite = enable_query_rewrite
+        self.dense_weight = dense_weight
+        self.sparse_weight = sparse_weight
         
         # 延迟加载组件
         self.vectorizer = None
@@ -119,6 +121,13 @@ class EnhancedRAGRetriever:
             except Exception as e:
                 logger.warning(f"上下文组装器加载失败：{e}")
     
+    def _should_use_hybrid(self, query: str) -> bool:
+        """混合检索触发：查询较长或含多词时使用 BM25+向量 RRF 融合。"""
+        q = (query or "").strip()
+        if len(q) <= 8:
+            return False
+        return len(q) > 25 or (q.count(" ") + q.count("，") + q.count("、")) >= 2
+    
     def retrieve(self, query: str, top_k: int = 5, 
                  return_context: bool = True,
                  filters: Dict[str, Any] = None) -> Any:
@@ -138,6 +147,9 @@ class EnhancedRAGRetriever:
         # 延迟加载组件
         self._lazy_init()
         
+        # 0. 混合检索触发：查询较长或词数多时用混合检索
+        use_hybrid_this_call = self.enable_hybrid and self._should_use_hybrid(query)
+        
         # 1. 查询改写（可选）
         queries_to_search = [query]
         if self.enable_query_rewrite and self.query_rewriter:
@@ -149,8 +161,8 @@ class EnhancedRAGRetriever:
         all_results = []
         
         for q in queries_to_search:
-            if self.enable_hybrid and self.hybrid_retriever:
-                # 混合检索
+            if use_hybrid_this_call and self.hybrid_retriever:
+                # 混合检索（BM25 + 向量 + RRF）
                 results = self.hybrid_retriever.search(q, top_k=top_k * 2)
             else:
                 # 纯向量检索

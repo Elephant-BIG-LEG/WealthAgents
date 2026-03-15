@@ -11,6 +11,7 @@ from .executor import Executor
 from .planner import Planner
 import os
 import sys
+import time
 import logging
 from typing import Dict, Any, Optional, Callable, List, TypedDict
 
@@ -278,6 +279,14 @@ class LangGraphAgent:
         logger.info("[执行节点] 开始执行任务")
         plan = state.get("plan", [])
         current_step = state.get("current_step", 0)
+
+        # 任务优先级与依赖调度
+        try:
+            from .state_machine import schedule_tasks_by_priority_and_dependency
+            plan = schedule_tasks_by_priority_and_dependency(plan)
+            state["plan"] = plan
+        except Exception as e:
+            logger.debug(f"优先级调度未应用: {e}")
 
         # 检查计划是否为空或已完成
         if not plan or current_step >= len(plan):

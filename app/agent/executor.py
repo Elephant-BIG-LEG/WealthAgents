@@ -95,9 +95,19 @@ class Executor:
                 if dependency_results:
                     tool_params['dependency_results'] = dependency_results
 
-                # 执行任务
+                # 统一 JSON 接口：支持 BaseTool.run(ToolInput) 与普通可调用工具
                 start_time = time.time()
-                result = tool(**tool_params)
+                if hasattr(tool, "run") and callable(getattr(tool, "run")):
+                    query = tool_params.pop("query", "") or tool_params.pop("text", "")
+                    result = tool.run(query=query, **tool_params)
+                elif hasattr(tool, "execute") and callable(getattr(tool, "execute")):
+                    from .tools.base_tool import ToolInput
+                    inp = ToolInput(query=params.get("query", ""), params=tool_params)
+                    result = tool.execute(inp)
+                    if hasattr(result, "to_dict"):
+                        result = result.to_dict()
+                else:
+                    result = tool(**tool_params)
                 execution_time = time.time() - start_time
 
                 # 确保结果是字典类型

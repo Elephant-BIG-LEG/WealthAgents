@@ -300,6 +300,43 @@ class MemoryManager:
             for key in keys_to_delete:
                 del self.memory_store[key]
 
+    def update_context_from_turn(
+        self,
+        session_id: str,
+        user_message: str,
+        tool_results: Optional[List[Dict[str, Any]]] = None,
+        assistant_response: Any = None,
+        max_turns: int = 20,
+    ):
+        """
+        根据本轮对话动态更新上下文：追加用户消息、工具调用结果、助手回复。
+        用于多轮对话与连贯工具调用。
+        """
+        ctx = self.get_conversation_context(session_id) or {}
+        history = ctx.get("conversation_history") or []
+        history.append({
+            "role": "user",
+            "content": user_message,
+            "timestamp": time.time(),
+        })
+        if tool_results:
+            history.append({
+                "role": "tool_results",
+                "content": tool_results,
+                "timestamp": time.time(),
+            })
+        if assistant_response is not None:
+            history.append({
+                "role": "assistant",
+                "content": assistant_response,
+                "timestamp": time.time(),
+            })
+        if len(history) > max_turns * 3:
+            history = history[-(max_turns * 3) :]
+        ctx["conversation_history"] = history
+        ctx["last_update"] = time.time()
+        self.save_conversation_context(session_id, ctx)
+
     def get_context(self, user_id: str, user_query: str) -> List[Dict[str, Any]]:
         """
         获取与用户查询相关的上下文历史，使用Redis ZSet按时间排序获取最新10条

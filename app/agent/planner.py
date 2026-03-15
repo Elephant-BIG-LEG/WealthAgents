@@ -13,6 +13,13 @@ from datetime import datetime
 from app.Embedding.Vectorization import TextVectorizer
 from app.store.faiss_store import FaissVectorStore
 
+# 优先使用 768 维 SBert（与 text2vec-base-chinese 一致）
+try:
+    from app.config.config import RAG_EMBEDDING_DIM
+    _DEFAULT_VECTOR_DIM = RAG_EMBEDDING_DIM
+except ImportError:
+    _DEFAULT_VECTOR_DIM = 128
+
 
 @dataclass
 class Task:
@@ -30,14 +37,23 @@ class Planner:
 
     def __init__(self):
         self.task_counter = 0
-        # 初始化向量化器和知识库
-        self.vectorizer = TextVectorizer(vector_dim=128)
+        # 优先使用 768 维 SBert + FAISS，与 RAG 配置一致
+        self.vectorizer = None
+        self.vector_store = None
         try:
-            self.vector_store = FaissVectorStore(dimension=128)
-            print(f"知识库初始化完成，包含 {self.vector_store.get_vector_count()} 条向量数据")
+            from app.Embedding.sbert_vectorization import SBertVectorizer
+            from app.config.config import RAG_EMBEDDING_MODEL
+            self.vectorizer = SBertVectorizer(model_name=RAG_EMBEDDING_MODEL)
+            self.vector_store = FaissVectorStore(dimension=_DEFAULT_VECTOR_DIM)
+            print(f"知识库初始化完成（768维SBert），包含 {self.vector_store.get_vector_count()} 条向量数据")
         except Exception as e:
-            print(f"知识库初始化失败: {str(e)}")
-            self.vector_store = None
+            print(f"SBert/768维知识库初始化失败: {e}，回退到 128 维")
+            self.vectorizer = TextVectorizer(vector_dim=128)
+            try:
+                self.vector_store = FaissVectorStore(dimension=128)
+            except Exception as e2:
+                print(f"知识库初始化失败: {str(e2)}")
+                self.vector_store = None
 
         # 定义任务类型关键词
         self.task_type_keywords = {
@@ -83,7 +99,31 @@ class Planner:
 
         # 获取推荐的工具列表
         recommended_tools = self._get_available_tools(task_type)
-        
+        # 智能工具路由：优先使用 LLM 进行精准工具选择，关键词匹配作为辅助
+        try:
+            from app.agent.tool_router import ToolRouter
+            router = ToolRouter(enable_llm_selection=True)
+            available = list(set(recommended_tools))
+            
+            # 获取工具定义（简化版本，实际应用中应从工具注册表获取完整定义）
+            tool_definitions = [
+                {"name": tool_name, "description": f"{tool_name}工具"} 
+                for tool_name in available
+            ]
+            
+            # 优先使用 LLM 进行工具选择
+            smart_tools = router.recommend_tools(
+                query=user_query, 
+                available_tools=available, 
+                tool_definitions=tool_definitions,
+                use_llm=True
+            )
+            
+            if smart_tools:
+                recommended_tools = smart_tools + [t for t in recommended_tools if t not in smart_tools]
+        except Exception as e:
+            logger.warning(f"智能工具路由失败，使用默认工具列表: {e}")
+            pass
         # 检查是否有调整建议，根据建议优化推荐工具
         adjustment_suggestions = planning_context.get("adjustment_suggestions", [])
         if adjustment_suggestions:
@@ -390,24 +430,36 @@ class Planner:
             
             # 回退到基础版检索
             print(f"使用基础版检索方法")
-            # 向量化查询文本
-            print(f"正在向量化查询文本：{query}")
-            query_vector = self.vectorizer.vectorize_text(query)
-            print(f"查询向量生成成功，维度：{len(query_vector)}")
-            
-            # 从知识库检索
-            print(f"正在从知识库检索，top_k={top_k}")
-            results = self.vector_store.search_similar(query_vector, top_k)
-            print(f"原始检索结果：{results}")
-            
-            # 降低相似度阈值，提高检索成功率
-            filtered_results = [(text, sim, meta)
-                                for text, sim, meta in results if sim > 0.1]
-            print(f"过滤后结果（相似度>0.1）: {filtered_results}")
-            
-            return filtered_results
+            try:
+                # 向量化查询文本
+                print(f"正在向量化查询文本：{query}")
+                query_vector = self.vectorizer.vectorize_text(query)
+                print(f"查询向量生成成功，维度：{len(query_vector)}")
+                
+                # 从知识库检索
+                print(f"正在从知识库检索，top_k={top_k}")
+                results = self.vector_store.search_similar(query_vector, top_k)
+                print(f"原始检索结果：{results}")
+                
+                # 降低相似度阈值，提高检索成功率
+                filtered_results = [(text, sim, meta)
+                                    for text, sim, meta in results if sim > 0.1]
+                print(f"过滤后结果（相似度>0.1）: {filtered_results}")
+                
+                return filtered_results
+            except ImportError as e:
+                # 处理sentence-transformers未安装的情况
+                print(f"知识库检索失败：缺少依赖库 - {str(e)}")
+                print("提示：请运行 'pip install sentence-transformers' 安装所需依赖")
+                return []
+            except Exception as e:
+                # 处理其他向量化或检索失败的情况
+                print(f"知识库检索失败：{str(e)}")
+                import traceback
+                traceback.print_exc()
+                return []
         except Exception as e:
-            print(f"知识库检索失败：{str(e)}")
+            print(f"知识库检索初始化失败：{str(e)}")
             import traceback
             traceback.print_exc()
             return []

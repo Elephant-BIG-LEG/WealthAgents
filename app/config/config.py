@@ -22,3 +22,14 @@ DB_CONFIG = {
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here')
 
+# RAG 与向量化配置（Sentence-BERT text2vec-base-chinese 为 768 维）
+RAG_EMBEDDING_MODEL = os.getenv("RAG_EMBEDDING_MODEL", "shibing624/text2vec-base-chinese")
+RAG_EMBEDDING_DIM = 768
+RAG_FAISS_INDEX_PATH = os.getenv("RAG_FAISS_INDEX_PATH", "faiss_index.bin")
+RAG_CHUNK_SIZE = int(os.getenv("RAG_CHUNK_SIZE", "600"))
+RAG_CHUNK_OVERLAP = int(os.getenv("RAG_CHUNK_OVERLAP", "90"))
+RAG_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
+RAG_USE_HYBRID = os.getenv("RAG_USE_HYBRID", "true").lower() == "true"
+RAG_HYBRID_DENSE_WEIGHT = float(os.getenv("RAG_HYBRID_DENSE_WEIGHT", "0.6"))
+RAG_HYBRID_SPARSE_WEIGHT = float(os.getenv("RAG_HYBRID_SPARSE_WEIGHT", "0.4"))
+
